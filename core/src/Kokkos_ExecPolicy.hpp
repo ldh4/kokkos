@@ -276,6 +276,195 @@ class RangePolicy : public Impl::PolicyTraits<Properties...> {
   };
 };
 
+template <class... Properties>
+class MyPolicy : Kokkos::Impl::PolicyTraits<Properties...> {
+ public:
+  using traits = Impl::PolicyTraits<Properties...>;
+
+ private:
+  typename traits::execution_space m_space;
+  typename traits::index_type m_begin;
+  typename traits::index_type m_end;
+  typename traits::index_type m_granularity;
+  typename traits::index_type m_granularity_mask;
+
+  template <class... OtherProperties>
+  friend class MyPolicy;
+
+ public:
+  //! Tag this class as an execution policy
+  using execution_policy = MyPolicy<Properties...>;
+  using member_type      = typename traits::index_type;
+  using index_type       = typename traits::index_type;
+
+  KOKKOS_INLINE_FUNCTION const typename traits::execution_space& space() const {
+    return m_space;
+  }
+  KOKKOS_INLINE_FUNCTION member_type begin() const { return m_begin; }
+  KOKKOS_INLINE_FUNCTION member_type end() const { return m_end; }
+
+  // TODO: find a better workaround for Clangs weird instantiation order
+  // This thing is here because of an instantiation error, where the MyPolicy
+  // is inserted into FunctorValue Traits, which tries decltype on the operator.
+  // It tries to do this even though the first argument of parallel for clearly
+  // doesn't match.
+  void operator()(const int&) const {}
+
+  template <class... OtherProperties>
+  MyPolicy(const MyPolicy<OtherProperties...>& p)
+      : traits(p),  // base class may contain data such as desired occupancy
+        m_space(p.m_space),
+        m_begin(p.m_begin),
+        m_end(p.m_end),
+        m_granularity(p.m_granularity),
+        m_granularity_mask(p.m_granularity_mask) {}
+
+  inline MyPolicy()
+      : m_space(),
+        m_begin(0),
+        m_end(0),
+        m_granularity(0),
+        m_granularity_mask(0) {}
+
+  /** \brief  Total range */
+  inline MyPolicy(const typename traits::execution_space& work_space,
+                  const member_type work_begin, const member_type work_end)
+      : m_space(work_space),
+        m_begin(work_begin < work_end ? work_begin : 0),
+        m_end(work_begin < work_end ? work_end : 0),
+        m_granularity(0),
+        m_granularity_mask(0) {
+    set_auto_chunk_size();
+  }
+
+  /** \brief  Total range */
+  inline MyPolicy(const member_type work_begin, const member_type work_end)
+      : MyPolicy(typename traits::execution_space(), work_begin, work_end) {
+    set_auto_chunk_size();
+  }
+
+  /** \brief  Total range */
+  template <class... Args>
+  inline MyPolicy(const typename traits::execution_space& work_space,
+                  const member_type work_begin, const member_type work_end,
+                  Args... args)
+      : m_space(work_space),
+        m_begin(work_begin < work_end ? work_begin : 0),
+        m_end(work_begin < work_end ? work_end : 0),
+        m_granularity(0),
+        m_granularity_mask(0) {
+    set_auto_chunk_size();
+    set(args...);
+  }
+
+  /** \brief  Total range */
+  template <class... Args>
+  inline MyPolicy(const member_type work_begin, const member_type work_end,
+                  Args... args)
+      : MyPolicy(typename traits::execution_space(), work_begin, work_end) {
+    set_auto_chunk_size();
+    set(args...);
+  }
+
+ private:
+  inline void set() {}
+
+ public:
+  template <class... Args>
+  inline void set(Args...) {
+    static_assert(
+        0 == sizeof...(Args),
+        "Kokkos::MyPolicy: unhandled constructor arguments encountered.");
+  }
+
+  template <class... Args>
+  inline void set(const ChunkSize& chunksize, Args... args) {
+    m_granularity      = chunksize.value;
+    m_granularity_mask = m_granularity - 1;
+    set(args...);
+  }
+
+ public:
+  /** \brief return chunk_size */
+  inline member_type chunk_size() const { return m_granularity; }
+
+  /** \brief set chunk_size to a discrete value*/
+  inline MyPolicy set_chunk_size(int chunk_size_) const {
+    MyPolicy p           = *this;
+    p.m_granularity      = chunk_size_;
+    p.m_granularity_mask = p.m_granularity - 1;
+    return p;
+  }
+
+ private:
+  /** \brief finalize chunk_size if it was set to AUTO*/
+  inline void set_auto_chunk_size() {
+    int64_t concurrency =
+        static_cast<int64_t>(traits::execution_space::concurrency());
+    if (concurrency == 0) concurrency = 1;
+
+    if (m_granularity > 0) {
+      if (!Impl::is_integral_power_of_two(m_granularity))
+        Kokkos::abort("MyPolicy blocking granularity must be power of two");
+    }
+
+    int64_t new_chunk_size = 1;
+    while (new_chunk_size * 100 * concurrency <
+           static_cast<int64_t>(m_end - m_begin))
+      new_chunk_size *= 2;
+    if (new_chunk_size < 128) {
+      new_chunk_size = 1;
+      while ((new_chunk_size * 40 * concurrency <
+              static_cast<int64_t>(m_end - m_begin)) &&
+             (new_chunk_size < 128))
+        new_chunk_size *= 2;
+    }
+    m_granularity      = new_chunk_size;
+    m_granularity_mask = m_granularity - 1;
+  }
+
+ public:
+  /** \brief  Subrange for a partition's rank and size.
+   *
+   *  Typically used to partition a range over a group of threads.
+   */
+  struct WorkRange {
+    using work_tag    = typename MyPolicy<Properties...>::work_tag;
+    using member_type = typename MyPolicy<Properties...>::member_type;
+
+    KOKKOS_INLINE_FUNCTION member_type begin() const { return m_begin; }
+    KOKKOS_INLINE_FUNCTION member_type end() const { return m_end; }
+
+    /** \brief  Subrange for a partition's rank and size.
+     *
+     *  Typically used to partition a range over a group of threads.
+     */
+    KOKKOS_INLINE_FUNCTION
+    WorkRange(const MyPolicy& range, const int part_rank, const int part_size)
+        : m_begin(0), m_end(0) {
+      if (part_size) {
+        // Split evenly among partitions, then round up to the granularity.
+        const member_type work_part =
+            ((((range.end() - range.begin()) + (part_size - 1)) / part_size) +
+             range.m_granularity_mask) &
+            ~member_type(range.m_granularity_mask);
+
+        m_begin = range.begin() + work_part * part_rank;
+        m_end   = m_begin + work_part;
+
+        if (range.end() < m_begin) m_begin = range.end();
+        if (range.end() < m_end) m_end = range.end();
+      }
+    }
+
+   private:
+    member_type m_begin;
+    member_type m_end;
+    WorkRange();
+    WorkRange& operator=(const WorkRange&);
+  };
+};
+
 }  // namespace Kokkos
 
 //----------------------------------------------------------------------------
@@ -788,6 +977,28 @@ struct VectorSingleStruct {
   VectorSingleStruct(const TeamMemberType& team_member_)
       : team_member(team_member_) {}
 };
+
+template <Kokkos::Iterate direction, typename iType, typename TeamMemberType>
+struct MDTeamThreadRangeBoundariesStruct {
+  MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member, iType iCount)
+      : start(0), end(iCount), team(member) {}
+
+  using index_type       = iType;
+  using team_member_type = TeamMemberType;
+  using execution_space  = typename TeamMemberType::execution_space;
+  using array_layout     = typename execution_space::array_layout;
+
+  static const Kokkos::Iterate outer_iteration_pattern =
+      Kokkos::layout_iterate_type_selector<
+          array_layout>::outer_iteration_pattern;
+
+  const iType start;
+  const iType end;
+  const team_member_type& team;
+};
+
+template <typename Direction>
+struct MDThreadVectorRangeBoundariesStruct {};
 
 }  // namespace Impl
 

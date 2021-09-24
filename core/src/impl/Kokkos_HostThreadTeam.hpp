@@ -489,9 +489,8 @@ class HostThreadTeamMember {
   //--------------------------------------------------------------------------
 
   template <typename T>
-  KOKKOS_INLINE_FUNCTION void team_broadcast(T& value,
-                                             const int source_team_rank) const
-      noexcept
+  KOKKOS_INLINE_FUNCTION void team_broadcast(
+      T& value, const int source_team_rank) const noexcept
 #if defined(KOKKOS_ACTIVE_EXECUTION_MEMORY_SPACE_HOST)
   {
     if (1 < m_data.m_team_size) {
@@ -525,9 +524,8 @@ class HostThreadTeamMember {
   //--------------------------------------------------------------------------
 
   template <class Closure, typename T>
-  KOKKOS_INLINE_FUNCTION void team_broadcast(Closure const& f, T& value,
-                                             const int source_team_rank) const
-      noexcept
+  KOKKOS_INLINE_FUNCTION void team_broadcast(
+      Closure const& f, T& value, const int source_team_rank) const noexcept
 #if defined(KOKKOS_ACTIVE_EXECUTION_MEMORY_SPACE_HOST)
   {
     T volatile* const shared_value = (T*)m_data.team_reduce();
@@ -772,6 +770,30 @@ TeamThreadRange(
       typename std::common_type<iType1, iType2>::type, Member>(member, begin,
                                                                end);
 }
+
+// NLIBER
+template <Kokkos::Iterate Direction, typename iType, typename Member>
+KOKKOS_INLINE_FUNCTION
+    Impl::MDTeamThreadRangeBoundariesStruct<Direction, iType, Member>
+    MDTeamThreadRange(Member const& member, iType count) {
+  return Impl::MDTeamThreadRangeBoundariesStruct<Direction, iType, Member>(
+      member, count);
+}
+
+template <typename iType, typename Member>
+KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member,
+                                              iType count) {
+  using execution_space = typename Member::execution_space;
+  using array_layout    = typename execution_space::array_layout;
+  static constexpr Kokkos::Iterate outer_iteration_pattern =
+      Kokkos::layout_iterate_type_selector<
+          array_layout>::outer_iteration_pattern;
+
+  return Impl::MDTeamThreadRangeBoundariesStruct<outer_iteration_pattern, iType,
+                                                 Member>(member, count);
+}
+
+// END NLIBER
 
 template <typename iType, typename Member>
 KOKKOS_INLINE_FUNCTION Impl::TeamThreadRangeBoundariesStruct<iType, Member>
