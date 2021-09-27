@@ -981,7 +981,7 @@ struct VectorSingleStruct {
 template <Kokkos::Iterate direction, typename iType, typename TeamMemberType>
 struct MDTeamThreadRangeBoundariesStruct {
   MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member, iType iCount)
-      : start(0), end(iCount), team(member) {}
+      : start(0), end(iCount), thread(member) {}
 
   using index_type       = iType;
   using team_member_type = TeamMemberType;
@@ -994,7 +994,7 @@ struct MDTeamThreadRangeBoundariesStruct {
 
   const iType start;
   const iType end;
-  const team_member_type& team;
+  const team_member_type& thread;
 };
 
 template <typename Direction>

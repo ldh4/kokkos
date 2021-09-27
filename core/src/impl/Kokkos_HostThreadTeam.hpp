@@ -881,6 +881,34 @@ KOKKOS_INLINE_FUNCTION void parallel_for(
   }
 }
 
+// NLIBER
+template <Kokkos::Iterate direction, typename iType, typename TeamMemberType,
+          typename Closure>
+KOKKOS_INLINE_FUNCTION void parallel_for(
+    Impl::MDTeamThreadRangeBoundariesStruct<
+        direction, iType, TeamMemberType> const& loop_boundaries,
+    Closure const& closure,
+    typename std::enable_if<
+        Impl::is_host_thread_team_member<TeamMemberType>::value>::type const** =
+        nullptr) {
+  if (direction == Kokkos::Iterate::Left) {
+    for (iType i = loop_boundaries.start; i < loop_boundaries.end;
+         i += loop_boundaries.increment) {
+      closure(i);
+    }
+  } else if (direction == Kokkos::Iterate::Right) {
+    for (iType i = loop_boundaries.end - 1; i >= loop_boundaries.start;
+         i -= loop_boundaries.increment) {
+      closure(i);
+    }
+  } else {
+    Kokkos::abort(
+        "direction must be either Kokkos::Iterate::Left or "
+        "Kokkos::Iterator::Right");
+  }
+}
+// END NLIBER
+
 //----------------------------------------------------------------------------
 
 template <typename iType, class Closure, class Reducer, class Member>
