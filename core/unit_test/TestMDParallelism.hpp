@@ -1580,3 +1580,9 @@ struct TestTeamPolicyHandleByValue {
 #endif
 
 /*--------------------------------------------------------------------------*/
+
+namespace Test {
+     TEST(TEST_CATEGORY, ParallelFor) {
+           TestMDParallelism<TEST_EXECSPACE, Kokkos::Schedule<Kokkos::Static>>::test_for(1);
+     }
+}
