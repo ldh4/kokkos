@@ -53,16 +53,57 @@ namespace Test {
 
 namespace {
 
-template <class ExecSpace>
+template <typename ExecSpace>
 struct TestMDParallelFor {
+
+  // The difference between test_for2 and test_for2_with_direction is
+  // the call to MDThreadVectorRange.  test_for2 deduces all the
+  // parameters for the return type, whily test_for2_with_direction
+  // specifies the outer and inner directions (different code path).
+
+  template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection>
+  static void test_for2_with_direction(const int N0, const int N1) {
+    using DataType     = int;
+    using ViewType     = typename Kokkos::View<DataType **, ExecSpace>;
+    using HostViewType = typename ViewType::HostMirror;
+
+    const int s0 = 0;
+    const int s1 = 0;
+
+    ViewType v("v", N0, N1);
+
+    Kokkos::parallel_for(
+        Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
+        KOKKOS_LAMBDA(const auto &team) {
+          Kokkos::parallel_for(
+              Kokkos::MDThreadVectorRange<OuterDirection, InnerDirection>(
+                  team, N0, N1),
+              KOKKOS_LAMBDA(int i, int j) { v(i, j) = 3; });
+        });
+
+    HostViewType h_view = Kokkos::create_mirror_view(v);
+    Kokkos::deep_copy(h_view, v);
+
+    int counter = 0;
+    for (int i = s0; i < N0; ++i)
+      for (int j = s1; j < N1; ++j) {
+        if (h_view(i, j) != 3) {
+          ++counter;
+        }
+      }
+
+    if (counter != 0) {
+      printf(
+          "Offset Start + Default Layouts + InitTag op(): Errors in "
+          "test_for2; mismatches = %d\n\n",
+          counter);
+    }
+
+    ASSERT_EQ(counter, 0);
+  }
+
   static void test_for2(const int N0, const int N1) {
     {
-      using range_type =
-          typename Kokkos::MDRangePolicy<ExecSpace, Kokkos::Rank<2>,
-                                         Kokkos::IndexType<int>>;
-      using tile_type  = typename range_type::tile_type;
-      using point_type = typename range_type::point_type;
-
       using DataType     = int;
       using ViewType     = typename Kokkos::View<DataType **, ExecSpace>;
       using HostViewType = typename ViewType::HostMirror;
@@ -70,16 +111,7 @@ struct TestMDParallelFor {
       const int s0 = 0;
       const int s1 = 0;
 
-      range_type range(point_type{{s0, s1}}, point_type{{N0, N1}},
-                       tile_type{{3, 3}});
-
       ViewType v("v", N0, N1);
-
-#if 0
-     // Replacing this with MDThreadVectorRange stuff 
-      Kokkos::parallel_for(
-          range, KOKKOS_LAMBDA(const int i, const int j) { v(i, j) = 3; });
-#endif
 
       Kokkos::parallel_for(
           Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
@@ -111,47 +143,6 @@ struct TestMDParallelFor {
     }
   }
 };
-
-#if 0
-template <class ExecSpace>
-struct TestMDParallelFor {
-  static void test_for1(const int N0) {
-    using range_type = Kokkos::MDRangePolicy<ExecSpace, Kokkos::Rank<1>,
-                                             Kokkos::IndexType<int>>;
-    using tile_type  = typename range_type::tile_type;
-    using point_type = typename range_type::point_type;
-
-    using DataType     = int;
-    using ViewType     = typename Kokkos::View<DataType *, ExecSpace>;
-    using HostViewType = typename ViewType::HostMirror;
-
-    const int s0 = 1;
-
-    range_type range(point_type{s0}, point_type{N0}, tile_type{1});
-
-    ViewType v("v", N0);
-
-    Kokkos::parallel_for(
-        "pf", range, KOKKOS_LAMBDA(const int i) { v(i) = 3; });
-
-    HostViewType h_view = Kokkos::create_mirror_view(v);
-    Kokkos::deep_copy(h_view, v);
-
-    int counter = 0;
-    for (int j = s0; j < N0; ++j) {
-      if (h_view(j) != 3) {
-        ++counter;
-      }
-    }
-
-    if (counter != 0) {
-        printf("test_for2 had %d mismatches\n\n", counter);
-    }
-
-    ASSERT_EQ(counter, 0);
-  }
-};
-#endif
 
 template <class ExecSpace, class ScheduleType>
 struct TestMDParallelism {
@@ -1688,5 +1679,9 @@ TEST(TEST_CATEGORY, MDParallelFor) {
   // TestMDParallelism<TEST_EXECSPACE,
   // Kokkos::Schedule<Kokkos::Static>>::test_for( 1);
   TestMDParallelFor<TEST_EXECSPACE>::test_for2(16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<Kokkos::Iterate::Left, Kokkos::Iterate::Left>(16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<Kokkos::Iterate::Left, Kokkos::Iterate::Right>(16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<Kokkos::Iterate::Right, Kokkos::Iterate::Left>(16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<Kokkos::Iterate::Right, Kokkos::Iterate::Right>(16, 16);
 }
 }  // namespace Test
