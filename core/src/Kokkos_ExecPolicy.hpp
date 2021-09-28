@@ -962,6 +962,24 @@ struct ThreadVectorRangeBoundariesStruct {
       : start(static_cast<index_type>(arg_begin)), end(arg_end) {}
 };
 
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, typename iType, typename TeamMemberType>
+struct MDThreadVectorRangeBoundariesStruct {
+  static constexpr Kokkos::Iterate outer_direction = OuterDirection;
+  static constexpr Kokkos::Iterate inner_direction = InnerDirection;
+  using index_type                           = iType;
+  using team_member_type                     = TeamMemberType;
+
+  KOKKOS_INLINE_FUNCTION
+  constexpr MDThreadVectorRangeBoundariesStruct(team_member_type const& tmt,
+                                                index_type const& n0,
+                                                index_type const& n1)
+      : team_member(tmt), N0(n0), N1(n1) {}
+
+  team_member_type const& team_member;
+  const index_type N0;
+  const index_type N1;
+};
+
 template <class TeamMemberType>
 struct ThreadSingleStruct {
   const TeamMemberType& team_member;
@@ -996,9 +1014,6 @@ struct MDTeamThreadRangeBoundariesStruct {
   const iType end;
   const team_member_type& thread;
 };
-
-template <typename Direction>
-struct MDThreadVectorRangeBoundariesStruct {};
 
 }  // namespace Impl
 
