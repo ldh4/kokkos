@@ -49,13 +49,14 @@
 
 #include <Kokkos_Core.hpp>
 
+#include <pretty_name.h>
+
 namespace Test {
 
 namespace {
 
 template <typename ExecSpace>
 struct TestMDParallelFor {
-
   // The difference between test_for2 and test_for2_with_direction is
   // the call to MDThreadVectorRange.  test_for2 deduces all the
   // parameters for the return type, whily test_for2_with_direction
@@ -116,6 +117,18 @@ struct TestMDParallelFor {
       Kokkos::parallel_for(
           Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
           KOKKOS_LAMBDA(const auto &team) {
+#ifndef __SYCL_DEVICE_ONLY__
+            std::cout << cool::pretty_type<decltype(team)>() << '\n'
+                      << Kokkos::Impl::is_host_thread_team_member<decltype(
+                             team)>::value
+                      << '\n';
+            std::cout << " Checking "
+                         "Kokkos::Impl::HostThreadTeamMember<Kokkos::Serial>"
+                      << Kokkos::Impl::is_host_thread_team_member<
+                             Kokkos::Impl::HostThreadTeamMember<
+                                 Kokkos::Serial>>::value
+                      << '\n';
+#endif
             Kokkos::parallel_for(
                 Kokkos::MDThreadVectorRange(team, N0, N1),
                 KOKKOS_LAMBDA(int i, int j) { v(i, j) = 3; });
@@ -1679,9 +1692,13 @@ TEST(TEST_CATEGORY, MDParallelFor) {
   // TestMDParallelism<TEST_EXECSPACE,
   // Kokkos::Schedule<Kokkos::Static>>::test_for( 1);
   TestMDParallelFor<TEST_EXECSPACE>::test_for2(16, 16);
-  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<Kokkos::Iterate::Left, Kokkos::Iterate::Left>(16, 16);
-  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<Kokkos::Iterate::Left, Kokkos::Iterate::Right>(16, 16);
-  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<Kokkos::Iterate::Right, Kokkos::Iterate::Left>(16, 16);
-  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<Kokkos::Iterate::Right, Kokkos::Iterate::Right>(16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<
+      Kokkos::Iterate::Left, Kokkos::Iterate::Left>(16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<
+      Kokkos::Iterate::Left, Kokkos::Iterate::Right>(16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<
+      Kokkos::Iterate::Right, Kokkos::Iterate::Left>(16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<
+      Kokkos::Iterate::Right, Kokkos::Iterate::Right>(16, 16);
 }
 }  // namespace Test

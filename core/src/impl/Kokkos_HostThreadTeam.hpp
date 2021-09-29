@@ -56,6 +56,8 @@
 #include <limits>     // std::numeric_limits
 #include <algorithm>  // std::max
 
+#include <iostream> // NLIBER
+
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
@@ -936,18 +938,23 @@ KOKKOS_INLINE_FUNCTION void parallel_for(
 }
 
 template <Kokkos::Iterate outer_direction, Kokkos::Iterate inner_direction,
-          typename iType, typename TeamMemberType, typename Closure>
+          typename iType, typename Closure, typename TeamMemberType,
+          typename = std::enable_if_t<Impl::is_host_thread_team_member<TeamMemberType>::value>>
 KOKKOS_INLINE_FUNCTION void parallel_for(
     Impl::MDThreadVectorRangeBoundariesStruct<outer_direction, inner_direction,
                                               iType, TeamMemberType> const&
         loop_boundaries,
     Closure const& closure)
 #if 0
+// TODO Fix the SFINAE constraint
     typename std::enable_if<
-        Impl::is_host_thread_team_member<TeamMemberType>::value>::type const** =
+        Impl::is_host_thread_team_member<TeamMemberType>::value>::type const ** =
         nullptr)
 #endif
 {
+#ifndef __SYCL_DEVICE_ONLY__
+  std::cout << __PRETTY_FUNCTION__ << '\n';
+#endif
   static_assert(outer_direction == Kokkos::Iterate::Left ||
                     outer_direction == Kokkos::Iterate::Right,
                 "outer_direction must be Left or Right");
