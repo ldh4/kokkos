@@ -970,14 +970,35 @@ struct MDThreadVectorRangeBoundariesStruct {
   using team_member_type                     = TeamMemberType;
 
   KOKKOS_INLINE_FUNCTION
-  constexpr MDThreadVectorRangeBoundariesStruct(team_member_type const& tmt,
-                                                index_type const& n0,
-                                                index_type const& n1)
-      : team_member(tmt), N0(n0), N1(n1) {}
+  constexpr MDThreadVectorRangeBoundariesStruct(team_member_type const& tm,
+                                                index_type n0,
+                                                index_type n1)
+      : team_member(tm), N0(n0), N1(n1) {}
 
   team_member_type const& team_member;
   const index_type N0;
   const index_type N1;
+};
+
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, typename iType, typename TeamMemberType>
+struct MDTeamVectorRangeBoundariesStruct 
+{
+  static constexpr Kokkos::Iterate outer_direction = OuterDirection;
+  static constexpr Kokkos::Iterate inner_direction = InnerDirection;
+  using index_type                           = iType;
+  using team_member_type                     = TeamMemberType;
+
+  KOKKOS_INLINE_FUNCTION
+  constexpr MDTeamVectorRangeBoundariesStruct(team_member_type const& tm,
+                                                index_type n0,
+                                                index_type n1,
+                                                index_type n2)
+      : team_member(tm), N0(n0), N1(n1), N2(n2) {}
+
+  team_member_type const& team_member;
+  const index_type N0;
+  const index_type N1;
+  const index_type N2;
 };
 
 template <class TeamMemberType>
