@@ -1076,7 +1076,7 @@ KOKKOS_INLINE_FUNCTION
         --j;
         for (iType k = N2; k > 0;) {
           --k;
-          closure(i, j);
+          closure(i, j, k);
         }
       }
     }

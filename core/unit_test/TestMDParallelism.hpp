@@ -49,8 +49,6 @@
 
 #include <Kokkos_Core.hpp>
 
-#include <pretty_name.h>
-
 namespace Test {
 
 namespace {
@@ -86,12 +84,13 @@ struct TestMDParallelFor {
     Kokkos::deep_copy(h_view, v);
 
     int counter = 0;
-    for (int i = s0; i < N0; ++i)
+    for (int i = s0; i < N0; ++i) {
       for (int j = s1; j < N1; ++j) {
         if (h_view(i, j) != 3) {
           ++counter;
         }
       }
+    }
 
     if (counter != 0) {
       printf(
@@ -104,56 +103,131 @@ struct TestMDParallelFor {
   }
 
   static void test_for2(const int N0, const int N1) {
-    {
-      using DataType     = int;
-      using ViewType     = typename Kokkos::View<DataType **, ExecSpace>;
-      using HostViewType = typename ViewType::HostMirror;
+    using DataType     = int;
+    using ViewType     = typename Kokkos::View<DataType **, ExecSpace>;
+    using HostViewType = typename ViewType::HostMirror;
 
-      const int s0 = 0;
-      const int s1 = 0;
+    const int s0 = 0;
+    const int s1 = 0;
 
-      ViewType v("v", N0, N1);
+    ViewType v("v", N0, N1);
 
-      Kokkos::parallel_for(
-          Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
-          KOKKOS_LAMBDA(const auto &team) {
-#ifndef __SYCL_DEVICE_ONLY__
-            std::cout << cool::pretty_type<decltype(team)>() << '\n'
-                      << Kokkos::Impl::is_host_thread_team_member<decltype(
-                             team)>::value
-                      << '\n';
-            std::cout << " Checking "
-                         "Kokkos::Impl::HostThreadTeamMember<Kokkos::Serial>"
-                      << Kokkos::Impl::is_host_thread_team_member<
-                             Kokkos::Impl::HostThreadTeamMember<
-                                 Kokkos::Serial>>::value
-                      << '\n';
-#endif
-            Kokkos::parallel_for(
-                Kokkos::MDThreadVectorRange(team, N0, N1),
-                KOKKOS_LAMBDA(int i, int j) { v(i, j) = 3; });
-          });
+    Kokkos::parallel_for(
+        Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
+        KOKKOS_LAMBDA(const auto &team) {
+          Kokkos::parallel_for(
+              Kokkos::MDThreadVectorRange(team, N0, N1),
+              KOKKOS_LAMBDA(int i, int j) { v(i, j) = 3; });
+        });
 
-      HostViewType h_view = Kokkos::create_mirror_view(v);
-      Kokkos::deep_copy(h_view, v);
+    HostViewType h_view = Kokkos::create_mirror_view(v);
+    Kokkos::deep_copy(h_view, v);
 
-      int counter = 0;
-      for (int i = s0; i < N0; ++i)
-        for (int j = s1; j < N1; ++j) {
-          if (h_view(i, j) != 3) {
+    int counter = 0;
+    for (int i = s0; i < N0; ++i) {
+      for (int j = s1; j < N1; ++j) {
+        if (h_view(i, j) != 3) {
+          ++counter;
+        }
+      }
+    }
+
+    if (counter != 0) {
+      printf(
+          "Offset Start + Default Layouts + InitTag op(): Errors in "
+          "test_for2; mismatches = %d\n\n",
+          counter);
+    }
+
+    ASSERT_EQ(counter, 0);
+  }
+
+  static void test_for3(const int N0, const int N1, const int N2) {
+    using DataType     = int;
+    using ViewType     = typename Kokkos::View<DataType ***, ExecSpace>;
+    using HostViewType = typename ViewType::HostMirror;
+
+    const int s0 = 0;
+    const int s1 = 0;
+    const int s2 = 0;
+
+    ViewType v("v", N0, N1, N2);
+
+    Kokkos::parallel_for(
+        Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
+        KOKKOS_LAMBDA(const auto &team) {
+          Kokkos::parallel_for(
+              Kokkos::MDTeamVectorRange(team, N0, N1, N2),
+              KOKKOS_LAMBDA(int i, int j, int k) { v(i, j, k) = 3; });
+        });
+
+    HostViewType h_view = Kokkos::create_mirror_view(v);
+    Kokkos::deep_copy(h_view, v);
+
+    int counter = 0;
+    for (int i = s0; i < N0; ++i) {
+      for (int j = s1; j < N1; ++j) {
+        for (int k = s2; k < N2; ++k) {
+          if (h_view(i, j, k) != 3) {
             ++counter;
           }
         }
-
-      if (counter != 0) {
-        printf(
-            "Offset Start + Default Layouts + InitTag op(): Errors in "
-            "test_for2; mismatches = %d\n\n",
-            counter);
       }
-
-      ASSERT_EQ(counter, 0);
     }
+
+    if (counter != 0) {
+      printf(
+          "Offset Start + Default Layouts + InitTag op(): Errors in "
+          "test_for2; mismatches = %d\n\n",
+          counter);
+    }
+
+    ASSERT_EQ(counter, 0);
+  }
+
+  template<Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection>
+  static void test_for3_with_direction(const int N0, const int N1, const int N2)
+{
+    using DataType     = int;
+    using ViewType     = typename Kokkos::View<DataType ***, ExecSpace>;
+    using HostViewType = typename ViewType::HostMirror;
+
+    const int s0 = 0;
+    const int s1 = 0;
+    const int s2 = 0;
+
+    ViewType v("v", N0, N1, N2);
+
+    Kokkos::parallel_for(
+        Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
+        KOKKOS_LAMBDA(const auto &team) {
+          Kokkos::parallel_for(
+              Kokkos::MDTeamVectorRange<OuterDirection, InnerDirection>(team, N0, N1, N2),
+              KOKKOS_LAMBDA(int i, int j, int k) { v(i, j, k) = 3; });
+        });
+
+    HostViewType h_view = Kokkos::create_mirror_view(v);
+    Kokkos::deep_copy(h_view, v);
+
+    int counter = 0;
+    for (int i = s0; i < N0; ++i) {
+      for (int j = s1; j < N1; ++j) {
+        for (int k = s2; k < N2; ++k) {
+          if (h_view(i, j, k) != 3) {
+            ++counter;
+          }
+        }
+      }
+    }
+
+    if (counter != 0) {
+      printf(
+          "Offset Start + Default Layouts + InitTag op(): Errors in "
+          "test_for2; mismatches = %d\n\n",
+          counter);
+    }
+
+    ASSERT_EQ(counter, 0);
   }
 };
 
@@ -1692,6 +1766,7 @@ TEST(TEST_CATEGORY, MDParallelFor) {
   // TestMDParallelism<TEST_EXECSPACE,
   // Kokkos::Schedule<Kokkos::Static>>::test_for( 1);
   TestMDParallelFor<TEST_EXECSPACE>::test_for2(16, 16);
+
   TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<
       Kokkos::Iterate::Left, Kokkos::Iterate::Left>(16, 16);
   TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<
@@ -1700,5 +1775,16 @@ TEST(TEST_CATEGORY, MDParallelFor) {
       Kokkos::Iterate::Right, Kokkos::Iterate::Left>(16, 16);
   TestMDParallelFor<TEST_EXECSPACE>::test_for2_with_direction<
       Kokkos::Iterate::Right, Kokkos::Iterate::Right>(16, 16);
+
+  TestMDParallelFor<TEST_EXECSPACE>::test_for3(16, 16, 16);
+
+  TestMDParallelFor<TEST_EXECSPACE>::test_for3_with_direction<
+      Kokkos::Iterate::Left, Kokkos::Iterate::Left>(16, 16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for3_with_direction<
+      Kokkos::Iterate::Left, Kokkos::Iterate::Right>(16, 16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for3_with_direction<
+      Kokkos::Iterate::Right, Kokkos::Iterate::Left>(16, 16, 16);
+  TestMDParallelFor<TEST_EXECSPACE>::test_for3_with_direction<
+      Kokkos::Iterate::Right, Kokkos::Iterate::Right>(16, 16, 16);
 }
 }  // namespace Test
