@@ -1186,6 +1186,86 @@ parallel_reduce(const Impl::ThreadVectorRangeBoundariesStruct<iType, Member>&
   }
 }
 
+// NLIBER
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
+          typename iType, class Lambda, typename ValueType, typename Member>
+KOKKOS_INLINE_FUNCTION
+    std::enable_if_t<!Kokkos::is_reducer<ValueType>::value &&
+                     Impl::is_host_thread_team_member<Member>::value>
+    parallel_reduce(
+        const Impl::MDThreadVectorRangeBoundariesStruct<
+            OuterDirection, InnerDirection, iType, Member>& loop_boundaries,
+        const Lambda& lambda, ValueType& result) {
+  static_assert(OuterDirection == Kokkos::Iterate::Left ||
+                    OuterDirection == Kokkos::Iterate::Right,
+                "OuterDirection must be Left or Right");
+  static_assert(InnerDirection == Kokkos::Iterate::Left ||
+                    InnerDirection == Kokkos::Iterate::Right,
+                "InnerDirection must be Left or Right");
+  const iType N0 = loop_boundaries.N0;
+  const iType N1 = loop_boundaries.N1;
+
+  result = ValueType();
+
+  parallel_for(loop_boundaries, [&](int i, int j) { lambda(i, j, result); });
+
+#if 0
+  if (OuterDirection == Kokkos::Iterate::Right &&
+      InnerDirection == Kokkos::Iterate::Right) {
+    for (iType i = 0; i < N0; ++i) {
+      for (iType j = 0; j < N1; ++j) {
+        lambda(i, j, result);
+      }
+    }
+  }
+  if (OuterDirection == Kokkos::Iterate::Right &&
+      InnerDirection == Kokkos::Iterate::Left) {
+    for (iType i = 0; i < N0; ++i) {
+      for (iType j = N1; j > 0;) {
+        --j;
+        lambda(i, j, result);
+      }
+    }
+  }
+  if (OuterDirection == Kokkos::Iterate::Left &&
+      InnerDirection == Kokkos::Iterate::Right) {
+    for (iType i = N0; i > 0;) {
+      --i;
+      for (iType j = 0; j < N1; ++j) {
+        lambda(i, j, result);
+      }
+    }
+  }
+  if (OuterDirection == Kokkos::Iterate::Left &&
+      InnerDirection == Kokkos::Iterate::Left) {
+    for (iType i = N0; i > 0;) {
+      --i;
+      for (iType j = N1; j > 0;) {
+        --j;
+        lambda(i, j, result);
+      }
+    }
+  }
+#endif
+}
+
+#if 0
+  template <typename iType, class Lambda, typename ReducerType, typename Member>
+  KOKKOS_INLINE_FUNCTION typename std::enable_if<
+      Kokkos::is_reducer<ReducerType>::value &&
+      Impl::is_host_thread_team_member<Member>::value>::type
+  parallel_reduce(const Impl::ThreadVectorRangeBoundariesStruct<iType, Member>&
+                      loop_boundaries,
+                  const Lambda& lambda, const ReducerType& reducer) {
+    reducer.init(reducer.reference());
+    for (iType i = loop_boundaries.start; i < loop_boundaries.end;
+         i += loop_boundaries.increment) {
+      lambda(i, reducer.reference());
+    }
+  }
+#endif
+// END NLIBER
+
 //----------------------------------------------------------------------------
 
 template <typename iType, class Closure, class Member>
