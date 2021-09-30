@@ -56,8 +56,6 @@
 #include <limits>     // std::numeric_limits
 #include <algorithm>  // std::max
 
-#include <iostream> // NLIBER
-
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 
@@ -938,23 +936,13 @@ KOKKOS_INLINE_FUNCTION void parallel_for(
 }
 
 template <Kokkos::Iterate outer_direction, Kokkos::Iterate inner_direction,
-          typename iType, typename Closure, typename TeamMemberType,
-          typename = std::enable_if_t<Impl::is_host_thread_team_member<TeamMemberType>::value>>
-KOKKOS_INLINE_FUNCTION void parallel_for(
-    Impl::MDThreadVectorRangeBoundariesStruct<outer_direction, inner_direction,
-                                              iType, TeamMemberType> const&
-        loop_boundaries,
-    Closure const& closure)
-#if 0
-// TODO Fix the SFINAE constraint
-    typename std::enable_if<
-        Impl::is_host_thread_team_member<TeamMemberType>::value>::type const ** =
-        nullptr)
-#endif
-{
-#ifndef __SYCL_DEVICE_ONLY__
-  std::cout << __PRETTY_FUNCTION__ << '\n';
-#endif
+          typename iType, typename Closure, typename TeamMemberType>
+KOKKOS_INLINE_FUNCTION
+    std::enable_if_t<Impl::is_host_thread_team_member<TeamMemberType>::value>
+    parallel_for(Impl::MDThreadVectorRangeBoundariesStruct<
+                     outer_direction, inner_direction, iType,
+                     TeamMemberType> const& loop_boundaries,
+                 Closure const& closure) {
   static_assert(outer_direction == Kokkos::Iterate::Left ||
                     outer_direction == Kokkos::Iterate::Right,
                 "outer_direction must be Left or Right");
@@ -964,39 +952,43 @@ KOKKOS_INLINE_FUNCTION void parallel_for(
   const iType N0 = loop_boundaries.N0;
   const iType N1 = loop_boundaries.N1;
 
-  if (outer_direction == Kokkos::Iterate::Left) {
-    if (inner_direction == Kokkos::Iterate::Left) {
-      for (iType i = 0; i < N0; ++i) {
-        for (iType j = 0; j < N1; ++j) {
-          closure(i, j);
-        }
-      }
-    } else {  // inner_direction == Kokkos::Iterate::Right
-      for (iType i = 0; i < N0; ++i) {
-        for (iType j = N1; j > 0;) {
-          --j;
-          closure(i, j);
-        }
-      }
-    }
-  } else {  // outer_direction == Kokkos::Iterate::Right
-    if (inner_direction == Kokkos::Iterate::Left) {
-      for (iType i = N0; i > 0;) {
-        --i;
-        for (iType j = 0; j < N1; ++j) {
-          closure(i, j);
-        }
-      }
-    } else {  // inner_direction == Kokkos::Iterate::Right
-      for (iType i = N0; i > 0;) {
-        --i;
-        for (iType j = N1; j > 0;) {
-          --j;
-          closure(i, j);
-        }
+  if (outer_direction == Kokkos::Iterate::Right &&
+      inner_direction == Kokkos::Iterate::Right) {
+    for (iType i = 0; i < N0; ++i) {
+      for (iType j = 0; j < N1; ++j) {
+        closure(i, j);
       }
     }
   }
+  if (outer_direction == Kokkos::Iterate::Right &&
+      inner_direction == Kokkos::Iterate::Left) {
+    for (iType i = 0; i < N0; ++i) {
+      for (iType j = N1; j > 0;) {
+        --j;
+        closure(i, j);
+      }
+    }
+  }
+  if (outer_direction == Kokkos::Iterate::Left &&
+      inner_direction == Kokkos::Iterate::Right) {
+    for (iType i = N0; i > 0;) {
+      --i;
+      for (iType j = 0; j < N1; ++j) {
+        closure(i, j);
+      }
+    }
+  }
+  if (outer_direction == Kokkos::Iterate::Left &&
+      inner_direction == Kokkos::Iterate::Left) {
+    for (iType i = N0; i > 0;) {
+      --i;
+      for (iType j = N1; j > 0;) {
+        --j;
+        closure(i, j);
+      }
+    }
+  }
+}
 }
 // END NLIBER
 
