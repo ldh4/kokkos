@@ -962,6 +962,25 @@ struct ThreadVectorRangeBoundariesStruct {
       : start(static_cast<index_type>(arg_begin)), end(arg_end) {}
 };
 
+template <Kokkos::Iterate direction, typename iType, typename TeamMemberType>
+struct MDTeamThreadRangeBoundariesStruct {
+  MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member, iType iCount)
+      : start(0), end(iCount), thread(member) {}
+
+  using index_type       = iType;
+  using team_member_type = TeamMemberType;
+  using execution_space  = typename TeamMemberType::execution_space;
+  using array_layout     = typename execution_space::array_layout;
+
+  static const Kokkos::Iterate outer_iteration_pattern =
+      Kokkos::layout_iterate_type_selector<
+          array_layout>::outer_iteration_pattern;
+
+  const iType start;
+  const iType end;
+  const team_member_type& thread;
+};
+
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, typename iType, typename TeamMemberType>
 struct MDThreadVectorRangeBoundariesStruct {
   static constexpr Kokkos::Iterate outer_direction = OuterDirection;
@@ -1015,25 +1034,6 @@ struct VectorSingleStruct {
   KOKKOS_INLINE_FUNCTION
   VectorSingleStruct(const TeamMemberType& team_member_)
       : team_member(team_member_) {}
-};
-
-template <Kokkos::Iterate direction, typename iType, typename TeamMemberType>
-struct MDTeamThreadRangeBoundariesStruct {
-  MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member, iType iCount)
-      : start(0), end(iCount), thread(member) {}
-
-  using index_type       = iType;
-  using team_member_type = TeamMemberType;
-  using execution_space  = typename TeamMemberType::execution_space;
-  using array_layout     = typename execution_space::array_layout;
-
-  static const Kokkos::Iterate outer_iteration_pattern =
-      Kokkos::layout_iterate_type_selector<
-          array_layout>::outer_iteration_pattern;
-
-  const iType start;
-  const iType end;
-  const team_member_type& thread;
 };
 
 }  // namespace Impl
