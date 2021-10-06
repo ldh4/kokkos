@@ -256,16 +256,16 @@ struct TestMDParallelReduce {
 
     Kokkos::parallel_reduce(
       Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
-      KOKKOS_LAMBDA(const auto& team, const int& totalSum) {
+      KOKKOS_LAMBDA(const auto& team, int& totalSum) {
 
         int teamSum = 0;
 
-        Kokkos::parllel_reduce(
+        Kokkos::parallel_reduce(
           Kokkos::MDTeamThreadRange(team, N0, N1),
           KOKKOS_LAMBDA(const int& i, const int& j, int& threadSum) {
             threadSum += v(i, j);
           },
-          teamSum;
+          teamSum
         );
 
         totalSum += teamSum;
