@@ -829,6 +829,8 @@ template <Kokkos::Iterate Direction, typename iType, typename Member,
           typename... Is>
 KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member, iType n0,
                                               iType n1, Is... ns) {
+  static_assert(2 + sizeof...(ns) <= 8, "Supports no more than 8 dimensions");
+
   return Impl::MDTeamThreadRangeBoundariesStruct<Direction, 2 + sizeof...(ns),
                                                  iType, Member>(member, n0, n1,
                                                                 ns...);
@@ -837,6 +839,8 @@ KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member, iType n0,
 template <typename iType, typename Member, typename... Is>
 KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member, iType n0,
                                               iType n1, Is... ns) {
+  static_assert(2 + sizeof...(ns) <= 8, "Supports no more than 8 dimensions");
+
   using execution_space = typename Member::execution_space;
   using array_layout    = typename execution_space::array_layout;
   static constexpr Kokkos::Iterate outer_iteration_pattern =
@@ -941,11 +945,11 @@ KOKKOS_INLINE_FUNCTION void parallel_for(
 // NLIBER
 // TODO remove this parallel_for
 
-template <Kokkos::Iterate direction, size_t Rank, typename iType,
-          typename TeamMemberType, typename Closure>
+template <Kokkos::Iterate direction, typename iType, typename TeamMemberType,
+          typename Closure>
 KOKKOS_INLINE_FUNCTION void operator_impl(
     Impl::MDTeamThreadRangeBoundariesStruct<
-        direction, Rank, iType, TeamMemberType> const& loop_boundaries,
+        direction, 2, iType, TeamMemberType> const& loop_boundaries,
     Closure const& closure,
     typename std::enable_if<
         Impl::is_host_thread_team_member<TeamMemberType>::value>::type const** =
@@ -959,6 +963,7 @@ KOKKOS_INLINE_FUNCTION void operator_impl(
   } else if (direction == Kokkos::Iterate::Left) {
     for (iType i = loop_boundaries.threadDims[0]; i > 0;) {
       --i;
+      auto l = [&](auto&& j) { closure(i, j); };
       for (iType j = 0; j < loop_boundaries.threadDims[1]; ++j) {
         closure(i, j);
       }
@@ -1003,6 +1008,45 @@ void operator_impl(Impl::MDTeamThreadRangeBoundariesStruct<
 }
 #endif
 
+// TODO move to Impl and possibly rename
+
+template <size_t RemainingRank>
+struct ParallelForHostImpl {
+  template <typename Boundaries, typename Closure>
+  static void parallel_for_host_impl(Boundaries const& boundaries,
+                                     Closure const& closure) {
+    using index_type = typename Boundaries::index_type;
+    if (Boundaries::direction == Kokkos::Iterate::Right) {
+      for (index_type i = 0;
+           i < boundaries.threadDims[Boundaries::rank - RemainingRank]; ++i) {
+        auto newClosure = [&](auto... is) { closure(i, is...); };
+        ParallelForHostImpl<RemainingRank - 1>::parallel_for_host_impl(
+            boundaries, newClosure);
+      }
+    }
+
+    if (Boundaries::direction == Kokkos::Iterate::Left) {
+      for (index_type i =
+               boundaries.threadDims[Boundaries::rank - RemainingRank];
+           i > 0;) {
+        --i;
+        auto newClosure = [&](auto... is) { closure(i, is...); };
+        ParallelForHostImpl<RemainingRank - 1>::parallel_for_host_impl(
+            boundaries, newClosure);
+      }
+    }
+  }
+};
+
+template <>
+struct ParallelForHostImpl<0> {
+  template <typename Boundaries, typename Closure>
+  static void parallel_for_host_impl(Boundaries const&,
+                                     Closure const& closure) {
+    closure();
+  }
+};
+
 template <Kokkos::Iterate direction, size_t Rank, typename iType,
           typename TeamMemberType, typename Closure>
 KOKKOS_INLINE_FUNCTION typename std::enable_if<
@@ -1010,7 +1054,7 @@ KOKKOS_INLINE_FUNCTION typename std::enable_if<
 parallel_for(Impl::MDTeamThreadRangeBoundariesStruct<
                  direction, Rank, iType, TeamMemberType> const& loop_boundaries,
              Closure const& closure) {
-  operator_impl(loop_boundaries, closure);
+  ParallelForHostImpl<Rank>::parallel_for_host_impl(loop_boundaries, closure);
 }
 
 template <Kokkos::Iterate outer_direction, Kokkos::Iterate inner_direction,
