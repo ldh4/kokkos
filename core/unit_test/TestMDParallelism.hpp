@@ -96,7 +96,7 @@ struct TestMDParallelFor {
         int leagueRank = team.league_rank();
 
         Kokkos::parallel_for(
-          Kokkos::MDTeamThreadRange(team, {N1, N2}),
+          Kokkos::MDTeamThreadRange(team, N1, N2),
           KOKKOS_LAMBDA(int i, int j) { v(leagueRank, i, j) = initValue; });
       });
 
@@ -124,7 +124,7 @@ struct TestMDParallelFor {
         int leagueRank = team.league_rank();
 
         Kokkos::parallel_for(
-          Kokkos::MDTeamThreadRange<Direction>(team, {N1, N2}),
+          Kokkos::MDTeamThreadRange<Direction>(team, N1, N2),
           KOKKOS_LAMBDA(int i, int j) { v(leagueRank, i, j) = initValue; });
       });
 

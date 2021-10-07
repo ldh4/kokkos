@@ -965,24 +965,19 @@ struct ThreadVectorRangeBoundariesStruct {
       : start(static_cast<index_type>(arg_begin)), end(arg_end) {}
 };
 
-template <Kokkos::Iterate Direction, typename iType, typename TeamMemberType>
+template <Kokkos::Iterate Direction, size_t Rank, typename iType,
+          typename TeamMemberType>
 struct MDTeamThreadRangeBoundariesStruct {
+  static_assert(Rank >= 2 && Rank <= 8, "2 <= Rank <= 8");
+
   static constexpr Kokkos::Iterate direction = Direction;
-  static constexpr iType invalid = std::numeric_limits<iType>::is_signed ?
-                                   std::numeric_limits<iType>::min() : std::numeric_limits<iType>::max();
+  static constexpr size_t rank               = Rank;
 
-  MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member, std::initializer_list<iType> dims)
-      : dim(dims.size()), threadDims(to_array(dims)), thread(member) {}
-
-  static std::array<iType,8> to_array(std::initializer_list<iType> dims) {
-    std::array<iType,8> tmpArray;
-    assert(dims.size() <= 8 && dims.size() >= 2);
-
-    tmpArray.fill(invalid);
-    std::copy(dims.begin(), dims.end(), tmpArray.begin());
-
-    return tmpArray;
-  }
+  // Is must all be convertible to iType
+  // sizeof(Is) == Rank
+  template <typename... Is>
+  MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member, Is... ns)
+      : threadDims{ns...}, thread(member) {}
 
   using index_type       = iType;
   using team_member_type = TeamMemberType;
@@ -993,23 +988,22 @@ struct MDTeamThreadRangeBoundariesStruct {
       Kokkos::layout_iterate_type_selector<
           array_layout>::outer_iteration_pattern;
 
-  const int dim;
-  const std::array<iType,8> threadDims;
+  const iType threadDims[Rank];
   const team_member_type& thread;
 };
 
-template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, typename iType, typename TeamMemberType>
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
+          typename iType, typename TeamMemberType>
 struct MDTeamVectorRangeBoundariesStruct {
   static constexpr Kokkos::Iterate outer_direction = OuterDirection;
   static constexpr Kokkos::Iterate inner_direction = InnerDirection;
-  using index_type                           = iType;
-  using team_member_type                     = TeamMemberType;
+  using index_type                                 = iType;
+  using team_member_type                           = TeamMemberType;
 
   KOKKOS_INLINE_FUNCTION
   constexpr MDTeamVectorRangeBoundariesStruct(team_member_type const& tm,
-                                                index_type n0,
-                                                index_type n1,
-                                                index_type n2)
+                                              index_type n0, index_type n1,
+                                              index_type n2)
       : team_member(tm), N0(n0), N1(n1), N2(n2) {}
 
   team_member_type const& team_member;
@@ -1018,17 +1012,17 @@ struct MDTeamVectorRangeBoundariesStruct {
   const index_type N2;
 };
 
-template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, typename iType, typename TeamMemberType>
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
+          typename iType, typename TeamMemberType>
 struct MDThreadVectorRangeBoundariesStruct {
   static constexpr Kokkos::Iterate outer_direction = OuterDirection;
   static constexpr Kokkos::Iterate inner_direction = InnerDirection;
-  using index_type                           = iType;
-  using team_member_type                     = TeamMemberType;
+  using index_type                                 = iType;
+  using team_member_type                           = TeamMemberType;
 
   KOKKOS_INLINE_FUNCTION
   constexpr MDThreadVectorRangeBoundariesStruct(team_member_type const& tm,
-                                                index_type n0,
-                                                index_type n1)
+                                                index_type n0, index_type n1)
       : team_member(tm), N0(n0), N1(n1) {}
 
   team_member_type const& team_member;
