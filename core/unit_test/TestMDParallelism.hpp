@@ -163,7 +163,9 @@ struct TestMDParallelFor {
       }
     }
 
-    const int expectedCounter = N0 * N1 * N2 * N3 * N4 * N5 * N6 * N7;
+    int expectedCounter = 1;
+    for (int i = 0; i != 8; ++i)
+        expectedCounter *= h_view.extent(i);
 
     ASSERT_EQ(expectedCounter, counter);
   }
@@ -295,6 +297,64 @@ struct TestMDParallelFor {
         KOKKOS_LAMBDA(const auto &team) {
           Kokkos::parallel_for(
               Kokkos::MDThreadVectorRange(team, N0, N1, N2, N3, N4, N5, N6, N7),
+              KOKKOS_LAMBDA(int i, int j, int k, int l, int m, int n, int o,
+                            int p) { v(i, j, k, l, m, n, o, p) = 3; });
+        });
+
+    HostViewType h_view = Kokkos::create_mirror_view(v);
+    Kokkos::deep_copy(h_view, v);
+
+    int counter = 0;
+    for (int i = s0; i < N0; ++i) {
+      for (int j = s1; j < N1; ++j) {
+        for (int k = s2; k < N2; ++k) {
+          for (int l = s3; l < N3; ++l) {
+            for (int m = s4; m < N4; ++m) {
+              for (int n = s5; n < N5; ++n) {
+                for (int o = s6; o < N6; ++o) {
+                  for (int p = s7; p < N7; ++p) {
+                    if (h_view(i, j, k, l, m, n, o, p) == 3) {
+                      ++counter;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const int expectedCounter = N0 * N1 * N2 * N3 * N4 * N5 * N6 * N7;
+
+    ASSERT_EQ(expectedCounter, counter);
+  }
+
+  template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection>
+  static void test_for8_MDThreadVectorRange_with_direction(
+      const int N0, const int N1, const int N2, const int N3, const int N4,
+      const int N5, const int N6, const int N7) {
+    using DataType     = int;
+    using ViewType     = typename Kokkos::View<DataType ********, ExecSpace>;
+    using HostViewType = typename ViewType::HostMirror;
+
+    const int s0 = 0;
+    const int s1 = 0;
+    const int s2 = 0;
+    const int s3 = 0;
+    const int s4 = 0;
+    const int s5 = 0;
+    const int s6 = 0;
+    const int s7 = 0;
+
+    ViewType v("v", N0, N1, N2, N3, N4, N5, N6, N7);
+
+    Kokkos::parallel_for(
+        Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
+        KOKKOS_LAMBDA(const auto &team) {
+          Kokkos::parallel_for(
+              Kokkos::MDThreadVectorRange<OuterDirection, InnerDirection>(
+                  team, N0, N1, N2, N3, N4, N5, N6, N7),
               KOKKOS_LAMBDA(int i, int j, int k, int l, int m, int n, int o,
                             int p) { v(i, j, k, l, m, n, o, p) = 3; });
         });
@@ -2097,6 +2157,23 @@ TEST(TEST_CATEGORY, MDParallelFor) {
 
     TestMDParallelFor<TEST_EXECSPACE>::test_for8_MDThreadVectorRange(
         N0, N1, N2, N3, N4, N5, N6, N7);
+
+    TestMDParallelFor<TEST_EXECSPACE>::
+        test_for8_MDThreadVectorRange_with_direction<Kokkos::Iterate::Left,
+                                                     Kokkos::Iterate::Left>(
+            N0, N1, N2, N3, N4, N5, N6, N7);
+    TestMDParallelFor<TEST_EXECSPACE>::
+        test_for8_MDThreadVectorRange_with_direction<Kokkos::Iterate::Left,
+                                                     Kokkos::Iterate::Right>(
+            N0, N1, N2, N3, N4, N5, N6, N7);
+    TestMDParallelFor<TEST_EXECSPACE>::
+        test_for8_MDThreadVectorRange_with_direction<Kokkos::Iterate::Right,
+                                                     Kokkos::Iterate::Left>(
+            N0, N1, N2, N3, N4, N5, N6, N7);
+    TestMDParallelFor<TEST_EXECSPACE>::
+        test_for8_MDThreadVectorRange_with_direction<Kokkos::Iterate::Right,
+                                                     Kokkos::Iterate::Right>(
+            N0, N1, N2, N3, N4, N5, N6, N7);
   }
 
 #if 0
