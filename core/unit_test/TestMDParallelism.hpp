@@ -1987,7 +1987,7 @@ TEST(TEST_CATEGORY, MDParallelFor) {
   // TestMDParallelism<TEST_EXECSPACE,
   // Kokkos::Schedule<Kokkos::Static>>::test_for( 1);
 
-  int dims[] = {16, 16, 16, 16, 16, 16, 16, 16};
+  int dims[] = {15, 16, 16, 16, 16, 16, 16, 16};
   //int dims[] = {8, 8, 8, 8, 8, 8, 8, 8};
 
   int N0 = dims[0];

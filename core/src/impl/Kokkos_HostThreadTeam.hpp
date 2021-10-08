@@ -975,43 +975,22 @@ KOKKOS_INLINE_FUNCTION void operator_impl(
   }
 }
 
-#if 0
-template <Kokkos::Iterate direction, typename iType, typename TeamMemberType, typename Closure>
-KOKKOS_INLINE_FUNCTION
-void operator_impl(Impl::MDTeamThreadRangeBoundariesStruct<
-                  direction, iType, TeamMemberType> const& loop_boundaries, Closure const& closure,
-                  typename std::enable_if<
-                  Impl::is_host_thread_team_member<TeamMemberType>::value>::type const** = nullptr) {
-
-  if (direction == Kokkos::Iterate::Right) {
-    for (iType i = 0; i < loop_boundaries.threadDims[0]; ++i) {
-      for (iType j = 0; j < loop_boundaries.threadDims[1]; ++j) {
-        for (iType k = 0; k < loop_boundaries.threadDims[2]; ++j) {
-          closure(i, j, k);
-        }
-      }
-    }
-  } else if (direction == Kokkos::Iterate::Left) {
-    for (iType i = loop_boundaries.threadDims[0]; i > 0;) {
-      --i;
-      for (iType j = 0; j < loop_boundaries.threadDims[1]; ++j) {
-        for (iType k = 0; j < loop_boundaries.threadDims[2]; ++j) {
-          closure(i, j, k);
-        }
-      }
-    }
-  } else {
-    Kokkos::abort(
-        "direction must be either Kokkos::Iterate::Left or "
-        "Kokkos::Iterator::Right");
-  }
-}
-#endif
-
 // TODO move to Impl and possibly rename
 
 template <size_t RemainingRank>
 struct ParallelForHostImpl {
+ private:
+  template <typename Boundaries, typename Closure, typename IndexType>
+  static void next_rank(Boundaries const& boundaries, Closure const& closure,
+                        IndexType i) {
+    auto newClosure = [i, &closure](auto... is) { closure(i, is...); };
+    ParallelForHostImpl<RemainingRank - 1>::parallel_for_host_impl(boundaries,
+                                                                   newClosure);
+  }
+
+ public:
+  static constexpr size_t remaining_rank = RemainingRank;
+
   template <typename Boundaries, typename Closure>
   static void parallel_for_host_impl(Boundaries const& boundaries,
                                      Closure const& closure) {
@@ -1019,9 +998,7 @@ struct ParallelForHostImpl {
     if (Boundaries::direction == Kokkos::Iterate::Right) {
       for (index_type i = 0;
            i < boundaries.threadDims[Boundaries::rank - RemainingRank]; ++i) {
-        auto newClosure = [&](auto... is) { closure(i, is...); };
-        ParallelForHostImpl<RemainingRank - 1>::parallel_for_host_impl(
-            boundaries, newClosure);
+        next_rank(boundaries, closure, i);
       }
     }
 
@@ -1029,10 +1006,7 @@ struct ParallelForHostImpl {
       for (index_type i =
                boundaries.threadDims[Boundaries::rank - RemainingRank];
            i > 0;) {
-        --i;
-        auto newClosure = [&](auto... is) { closure(i, is...); };
-        ParallelForHostImpl<RemainingRank - 1>::parallel_for_host_impl(
-            boundaries, newClosure);
+        next_rank(boundaries, closure, --i);
       }
     }
   }
@@ -1040,6 +1014,8 @@ struct ParallelForHostImpl {
 
 template <>
 struct ParallelForHostImpl<0> {
+  static constexpr size_t remaining_rank = 0;
+
   template <typename Boundaries, typename Closure>
   static void parallel_for_host_impl(Boundaries const&,
                                      Closure const& closure) {
