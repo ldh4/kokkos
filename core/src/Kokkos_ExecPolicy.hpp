@@ -993,23 +993,23 @@ struct MDTeamThreadRangeBoundariesStruct {
 };
 
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
-          typename iType, typename TeamMemberType>
+          size_t Rank, typename iType, typename TeamMemberType>
 struct MDTeamVectorRangeBoundariesStruct {
   static constexpr Kokkos::Iterate outer_direction = OuterDirection;
   static constexpr Kokkos::Iterate inner_direction = InnerDirection;
+  static constexpr size_t rank                     = Rank;
   using index_type                                 = iType;
   using team_member_type                           = TeamMemberType;
 
-  KOKKOS_INLINE_FUNCTION
-  constexpr MDTeamVectorRangeBoundariesStruct(team_member_type const& tm,
-                                              index_type n0, index_type n1,
-                                              index_type n2)
-      : team_member(tm), N0(n0), N1(n1), N2(n2) {}
+  // Is must all be convertible to iType
+  // sizeof(Is) == Rank
+  template <typename... Is>
+  KOKKOS_INLINE_FUNCTION constexpr MDTeamVectorRangeBoundariesStruct(
+      TeamMemberType const& tm, index_type n0, index_type n1, Is... ns)
+      : team_member(tm), taskDims{n0, n1, ns...} {}
 
   team_member_type const& team_member;
-  const index_type N0;
-  const index_type N1;
-  const index_type N2;
+  index_type taskDims[Rank];
 };
 
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
