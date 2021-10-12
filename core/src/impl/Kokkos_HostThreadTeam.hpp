@@ -879,18 +879,16 @@ KOKKOS_INLINE_FUNCTION auto MDThreadVectorRange(Member const& member, iType n0,
 }
 
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
-          typename iType, typename Member>
-KOKKOS_INLINE_FUNCTION Impl::MDTeamVectorRangeBoundariesStruct<
-    OuterDirection, InnerDirection, iType, Member>
-MDTeamVectorRange(Member const& member, iType n0, iType n1, iType n2) {
+          typename iType, typename Member, typename... Is>
+KOKKOS_INLINE_FUNCTION auto MDTeamVectorRange(Member const& member, iType n0, iType n1,
+                                              Is... ns) {
   return Impl::MDTeamVectorRangeBoundariesStruct<OuterDirection, InnerDirection,
-                                                 iType, Member>(member, n0, n1,
-                                                                n2);
+                                                 2 + sizeof...(ns), iType, Member>(member, n0, n1, ns...);
 }
 
-template <typename iType, typename Member>
+template <typename iType, typename Member, typename... Is>
 KOKKOS_INLINE_FUNCTION auto MDTeamVectorRange(Member const& member, iType n0,
-                                              iType n1, iType n2) {
+                                              iType n1, Is... ns) {
   using execution_space = typename Member::execution_space;
   using array_layout    = typename execution_space::array_layout;
   static constexpr Kokkos::Iterate outer_iteration_pattern =
@@ -901,8 +899,8 @@ KOKKOS_INLINE_FUNCTION auto MDTeamVectorRange(Member const& member, iType n0,
           array_layout>::inner_iteration_pattern;
 
   return Impl::MDTeamVectorRangeBoundariesStruct<
-      outer_iteration_pattern, inner_iteration_pattern, iType, Member>(
-      member, n0, n1, n2);
+      outer_iteration_pattern, inner_iteration_pattern, 2 + sizeof...(ns), iType, Member>(
+      member, n0, n1, ns...);
 }
 
 // END NLIBER
@@ -1106,13 +1104,64 @@ KOKKOS_INLINE_FUNCTION
                                                                   closure);
 }
 
+template <Kokkos::Iterate Direction, size_t RemainingRank>
+struct ParallelForMDTeamVectorRangeHostImpl {
+ private:
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void next_rank(
+      Boundaries const& boundaries, Closure const& closure,
+      typename Boundaries::index_type i) {
+    auto newClosure = [i, &closure](auto... is) { closure(i, is...); };
+    ParallelForMDTeamVectorRangeHostImpl<
+        Boundaries::inner_direction,
+        RemainingRank - 1>::parallel_for_impl(boundaries, newClosure);
+  }
+
+ public:
+  static constexpr Kokkos::Iterate direction = Direction;
+  static constexpr size_t remaining_rank     = RemainingRank;
+
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void parallel_for_impl(
+      Boundaries const& boundaries, Closure const& closure) {
+    using index_type = typename Boundaries::index_type;
+
+    if (Direction == Kokkos::Iterate::Right) {
+      for (index_type i = 0;
+           i < boundaries.taskDims[Boundaries::rank - RemainingRank]; ++i) {
+        next_rank(boundaries, closure, i);
+      }
+    }
+
+    if (Direction == Kokkos::Iterate::Left) {
+      for (index_type i = boundaries.taskDims[Boundaries::rank - RemainingRank];
+           i > 0;) {
+        next_rank(boundaries, closure, --i);
+      }
+    }
+  }
+};
+
+template <Kokkos::Iterate Direction>
+struct ParallelForMDTeamVectorRangeHostImpl<Direction, 0> {
+  static constexpr Kokkos::Iterate direction = Direction;
+  static constexpr size_t remaining_rank     = 0;
+
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void parallel_for_impl(Boundaries const&,
+                                                       Closure const& closure) {
+    closure();
+  }
+};
+
 template <Kokkos::Iterate outer_direction, Kokkos::Iterate inner_direction,
-          typename iType, typename Closure, typename TeamMemberType>
+          size_t Rank, typename iType, typename Closure,
+          typename TeamMemberType>
 KOKKOS_INLINE_FUNCTION
     std::enable_if_t<Impl::is_host_thread_team_member<TeamMemberType>::value>
     parallel_for(Impl::MDTeamVectorRangeBoundariesStruct<
-                     outer_direction, inner_direction, iType,
-                     TeamMemberType> const& loop_boundaries,
+                     outer_direction, inner_direction, Rank, iType,
+                     TeamMemberType> const& boundaries,
                  Closure const& closure) {
   static_assert(outer_direction == Kokkos::Iterate::Left ||
                     outer_direction == Kokkos::Iterate::Right,
@@ -1120,57 +1169,12 @@ KOKKOS_INLINE_FUNCTION
   static_assert(inner_direction == Kokkos::Iterate::Left ||
                     inner_direction == Kokkos::Iterate::Right,
                 "inner_direction must be Left or Right");
-  const iType N0 = loop_boundaries.N0;
-  const iType N1 = loop_boundaries.N1;
-  const iType N2 = loop_boundaries.N2;
 
-  if (outer_direction == Kokkos::Iterate::Right &&
-      inner_direction == Kokkos::Iterate::Right) {
-    for (iType i = 0; i < N0; ++i) {
-      for (iType j = 0; j < N1; ++j) {
-        for (iType k = 0; k < N2; ++k) {
-          closure(i, j, k);
-        }
-      }
-    }
-  }
-  if (outer_direction == Kokkos::Iterate::Right &&
-      inner_direction == Kokkos::Iterate::Left) {
-    for (iType i = 0; i < N0; ++i) {
-      for (iType j = N1; j > 0;) {
-        --j;
-        for (iType k = N2; k > 0;) {
-          --k;
-          closure(i, j, k);
-        }
-      }
-    }
-  }
-  if (outer_direction == Kokkos::Iterate::Left &&
-      inner_direction == Kokkos::Iterate::Right) {
-    for (iType i = N0; i > 0;) {
-      --i;
-      for (iType j = 0; j < N1; ++j) {
-        for (iType k = 0; k < N2; ++k) {
-          closure(i, j, k);
-        }
-      }
-    }
-  }
-  if (outer_direction == Kokkos::Iterate::Left &&
-      inner_direction == Kokkos::Iterate::Left) {
-    for (iType i = N0; i > 0;) {
-      --i;
-      for (iType j = N1; j > 0;) {
-        --j;
-        for (iType k = N2; k > 0;) {
-          --k;
-          closure(i, j, k);
-        }
-      }
-    }
-  }
+  ParallelForMDTeamVectorRangeHostImpl<outer_direction,
+                                      Rank>::parallel_for_impl(boundaries,
+                                                               closure);
 }
+
 // END NLIBER
 
 //----------------------------------------------------------------------------
@@ -1238,6 +1242,38 @@ Impl::TeamThreadRangeBoundariesStruct<iType,Impl::HostThreadTeamMember<Space> >
   loop_boundaries.thread.team_reduce( reducer );
 }*/
 
+// donlee
+template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename Member,
+          typename Closure, typename Reducer>
+KOKKOS_INLINE_FUNCTION typename std::enable_if_t<
+    Kokkos::is_reducer<Reducer>::value &&
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_reduce(
+    Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
+    Closure const& closure, Reducer const& reducer) {
+  typename Reducer::value_type value;
+  reducer.init(value);
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., value); } );
+
+  boundaries.thread.team_reduce(reducer, value);
+}
+
+template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename Member,
+          typename Closure, typename ValueType>
+KOKKOS_INLINE_FUNCTION typename std::enable_if_t<
+    !Kokkos::is_reducer<ValueType>::value &&
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_reduce(
+    Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
+    Closure const& closure, ValueType& result) {
+  Sum<ValueType> reducer(result);
+  reducer.init(result);
+
+  parallel_reduce(boundaries, closure, reducer);
+}
+// end of donlee
+
 //----------------------------------------------------------------------------
 /** \brief  Inter-thread vector parallel_reduce.
  *
@@ -1275,86 +1311,34 @@ parallel_reduce(const Impl::ThreadVectorRangeBoundariesStruct<iType, Member>&
   }
 }
 
-// NLIBER
-template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
-          size_t Rank, typename iType, class Lambda, typename ValueType,
-          typename Member>
-KOKKOS_INLINE_FUNCTION
-    std::enable_if_t<!Kokkos::is_reducer<ValueType>::value &&
-                     Impl::is_host_thread_team_member<Member>::value>
-    parallel_reduce(const Impl::MDThreadVectorRangeBoundariesStruct<
-                        OuterDirection, InnerDirection, Rank, iType, Member>&
-                        loop_boundaries,
-                    const Lambda& lambda, ValueType& result) {
-  static_assert(OuterDirection == Kokkos::Iterate::Left ||
-                    OuterDirection == Kokkos::Iterate::Right,
-                "OuterDirection must be Left or Right");
-  static_assert(InnerDirection == Kokkos::Iterate::Left ||
-                    InnerDirection == Kokkos::Iterate::Right,
-                "InnerDirection must be Left or Right");
-  const iType N0 = loop_boundaries.N0;
-  const iType N1 = loop_boundaries.N1;
+// donlee
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, size_t Rank,
+          typename iType, typename Member, typename Closure, typename Reducer>
+KOKKOS_INLINE_FUNCTION typename std::enable_if_t<
+    Kokkos::is_reducer<Reducer>::value &&
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_reduce(
+    Impl::MDThreadVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Member>
+    const& boundaries, Closure const& closure, Reducer const& reducer) {
+  typename Reducer::value_type value;
+  reducer.init(value);
 
-  result = ValueType();
-
-  parallel_for(loop_boundaries, [&](int i, int j) { lambda(i, j, result); });
-
-#if 0
-  if (OuterDirection == Kokkos::Iterate::Right &&
-      InnerDirection == Kokkos::Iterate::Right) {
-    for (iType i = 0; i < N0; ++i) {
-      for (iType j = 0; j < N1; ++j) {
-        lambda(i, j, result);
-      }
-    }
-  }
-  if (OuterDirection == Kokkos::Iterate::Right &&
-      InnerDirection == Kokkos::Iterate::Left) {
-    for (iType i = 0; i < N0; ++i) {
-      for (iType j = N1; j > 0;) {
-        --j;
-        lambda(i, j, result);
-      }
-    }
-  }
-  if (OuterDirection == Kokkos::Iterate::Left &&
-      InnerDirection == Kokkos::Iterate::Right) {
-    for (iType i = N0; i > 0;) {
-      --i;
-      for (iType j = 0; j < N1; ++j) {
-        lambda(i, j, result);
-      }
-    }
-  }
-  if (OuterDirection == Kokkos::Iterate::Left &&
-      InnerDirection == Kokkos::Iterate::Left) {
-    for (iType i = N0; i > 0;) {
-      --i;
-      for (iType j = N1; j > 0;) {
-        --j;
-        lambda(i, j, result);
-      }
-    }
-  }
-#endif
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., value); } );
 }
 
-#if 0
-  template <typename iType, class Lambda, typename ReducerType, typename Member>
-  KOKKOS_INLINE_FUNCTION typename std::enable_if<
-      Kokkos::is_reducer<ReducerType>::value &&
-      Impl::is_host_thread_team_member<Member>::value>::type
-  parallel_reduce(const Impl::ThreadVectorRangeBoundariesStruct<iType, Member>&
-                      loop_boundaries,
-                  const Lambda& lambda, const ReducerType& reducer) {
-    reducer.init(reducer.reference());
-    for (iType i = loop_boundaries.start; i < loop_boundaries.end;
-         i += loop_boundaries.increment) {
-      lambda(i, reducer.reference());
-    }
-  }
-#endif
-// END NLIBER
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, size_t Rank,
+          typename iType, typename Member, typename Closure, typename ValueType>
+KOKKOS_INLINE_FUNCTION typename std::enable_if_t<
+    !Kokkos::is_reducer<ValueType>::value &&
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_reduce(
+    Impl::MDThreadVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Member>
+    const& boundaries, Closure const& closure, ValueType& result) {
+  result = ValueType();
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., result); } );
+}
+// end of donlee
 
 //----------------------------------------------------------------------------
 
