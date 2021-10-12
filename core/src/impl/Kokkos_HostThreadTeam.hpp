@@ -1242,6 +1242,38 @@ Impl::TeamThreadRangeBoundariesStruct<iType,Impl::HostThreadTeamMember<Space> >
   loop_boundaries.thread.team_reduce( reducer );
 }*/
 
+// donlee
+template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename Member,
+          typename Closure, typename Reducer>
+KOKKOS_INLINE_FUNCTION typename std::enable_if_t<
+    Kokkos::is_reducer<Reducer>::value &&
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_reduce(
+    Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
+    Closure const& closure, Reducer const& reducer) {
+  typename Reducer::value_type value;
+  reducer.init(value);
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., value); } );
+
+  boundaries.thread.team_reduce(reducer, value);
+}
+
+template <Kokkos::Iterate Direction, size_t Rank, typename iType,
+          typename Closure, typename ValueType, typename Member>
+KOKKOS_INLINE_FUNCTION typename std::enable_if_t<
+    !Kokkos::is_reducer<ValueType>::value &&
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_reduce(
+    Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
+    Closure const& closure, ValueType& result) {
+  Sum<ValueType> reducer(result);
+  reducer.init(result);
+
+  parallel_reduce(boundaries, closure, reducer);
+}
+// end of donlee
+
 //----------------------------------------------------------------------------
 /** \brief  Inter-thread vector parallel_reduce.
  *
