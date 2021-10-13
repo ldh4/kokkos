@@ -826,12 +826,10 @@ ThreadVectorRange(
 
 // NLIBER
 template <
-    Kokkos::Iterate Direction, typename iType, typename Member, typename... Ns,
+    Kokkos::Iterate Direction, typename Member, typename... Ns,
     typename = std::enable_if_t<Impl::is_thread_team_member<Member>::value>>
-KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member, iType n0,
-                                              iType n1, Ns... ns) {
-  static_assert(2 + sizeof...(ns) <= 8, "Supports no more than 8 dimensions");
-
+KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member,
+                                              Ns&&... ns) {
   using execution_space = typename Member::execution_space;
   using array_layout    = typename execution_space::array_layout;
   static constexpr Kokkos::Iterate outer_direction =
@@ -839,17 +837,20 @@ KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member, iType n0,
           ? Kokkos::layout_iterate_type_selector<
                 array_layout>::outer_iteration_pattern
           : Direction;
+  using iType = std::common_type_t<Ns...>;
 
-  return Impl::MDTeamThreadRangeBoundariesStruct<
-      outer_direction, 2 + sizeof...(ns), iType, Member>(member, n0, n1, ns...);
+  return Impl::MDTeamThreadRangeBoundariesStruct<outer_direction, sizeof...(ns),
+                                                 iType, Member>(
+      member, static_cast<Ns&&>(ns)...);
 }
 
 template <
-    typename iType, typename Member, typename... Ns,
+    typename Member, typename... Ns,
     typename = std::enable_if_t<Impl::is_thread_team_member<Member>::value>>
-KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member, iType n0,
-                                              iType n1, Ns... ns) {
-  return MDTeamThreadRange<Kokkos::Iterate::Default>(member, n0, n1, ns...);
+KOKKOS_INLINE_FUNCTION auto MDTeamThreadRange(Member const& member,
+                                              Ns&&... ns) {
+  return MDTeamThreadRange<Kokkos::Iterate::Default>(member,
+                                                     static_cast<Ns&&>(ns)...);
 }
 
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,

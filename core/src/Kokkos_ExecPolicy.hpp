@@ -968,28 +968,26 @@ struct ThreadVectorRangeBoundariesStruct {
 template <Kokkos::Iterate Direction, size_t Rank, typename iType,
           typename TeamMemberType>
 struct MDTeamThreadRangeBoundariesStruct {
-  static_assert(Rank >= 2 && Rank <= 8, "2 <= Rank <= 8");
+  static_assert(2 <= Rank, "Rank must be at least 2");
+  static_assert(Rank <= 8, "Rank must be at most 8");
+  static_assert(Direction == Kokkos::Iterate::Left ||
+                    Direction == Kokkos::Iterate::Right,
+                "Direction must be Left or Right");
 
   static constexpr Kokkos::Iterate direction = Direction;
   static constexpr size_t rank               = Rank;
+  using index_type                           = iType;
+  using team_member_type                     = TeamMemberType;
 
   // Is must all be convertible to iType
   // sizeof(Is) == Rank
-  template <typename... Is>
-  MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member, Is... ns)
-      : threadDims{ns...}, thread(member) {}
-
-  using index_type       = iType;
-  using team_member_type = TeamMemberType;
-  using execution_space  = typename TeamMemberType::execution_space;
-  using array_layout     = typename execution_space::array_layout;
-
-  static const Kokkos::Iterate outer_iteration_pattern =
-      Kokkos::layout_iterate_type_selector<
-          array_layout>::outer_iteration_pattern;
+  template <typename... Ns>
+  explicit MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member,
+                                             Ns&&... ns)
+      : threadDims{static_cast<iType>(ns)...}, thread(member) {}
 
   const iType threadDims[Rank];
-  const team_member_type& thread;
+  const TeamMemberType& thread;
 };
 
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
@@ -1001,7 +999,6 @@ struct MDTeamVectorRangeBoundariesStruct {
   using index_type                                 = iType;
   using team_member_type                           = TeamMemberType;
 
-  // Is must all be convertible to iType
   // sizeof(Is) == Rank
   template <typename... Is>
   KOKKOS_INLINE_FUNCTION constexpr MDTeamVectorRangeBoundariesStruct(
