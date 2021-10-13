@@ -979,15 +979,48 @@ struct MDTeamThreadRangeBoundariesStruct {
   using index_type                           = iType;
   using team_member_type                     = TeamMemberType;
 
-  // Is must all be convertible to iType
-  // sizeof(Is) == Rank
+  // Ns must all be convertible to iType
+  // sizeof(Ns) == Rank
   template <typename... Ns>
-  explicit MDTeamThreadRangeBoundariesStruct(TeamMemberType const& member,
-                                             Ns&&... ns)
-      : threadDims{static_cast<iType>(ns)...}, thread(member) {}
+  KOKKOS_INLINE_FUNCTION constexpr explicit MDTeamThreadRangeBoundariesStruct(
+      TeamMemberType const& member, Ns&&... ns)
+      : thread(member), threadDims{static_cast<iType>(ns)...} {
+    static_assert(sizeof...(ns) == Rank, "Number of ns must equal Rank");
+  }
 
-  const iType threadDims[Rank];
-  const TeamMemberType& thread;
+  TeamMemberType const& thread;
+  iType const threadDims[Rank];
+};
+
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
+          size_t Rank, typename iType, typename TeamMemberType>
+struct MDThreadVectorRangeBoundariesStruct {
+  static constexpr Kokkos::Iterate outer_direction = OuterDirection;
+  static constexpr Kokkos::Iterate inner_direction = InnerDirection;
+  static constexpr size_t rank                     = Rank;
+  using index_type                                 = iType;
+  using team_member_type                           = TeamMemberType;
+
+  static_assert(2 <= Rank, "Rank must be at least 2");
+  static_assert(Rank <= 8, "Rank must be at most 8");
+  static_assert(OuterDirection == Kokkos::Iterate::Left ||
+                    OuterDirection == Kokkos::Iterate::Right,
+                "OuterDirection must be Left or Right");
+  static_assert(InnerDirection == Kokkos::Iterate::Left ||
+                    InnerDirection == Kokkos::Iterate::Right,
+                "InnerDirection must be Left or Right");
+
+  // Ns must all be convertible to iType
+  // sizeof(Ns) == Rank
+  template <typename... Ns>
+  KOKKOS_INLINE_FUNCTION constexpr explicit MDThreadVectorRangeBoundariesStruct(
+      TeamMemberType const& tm, Ns&&... ns)
+      : team_member(tm), taskDims{static_cast<iType>(ns)...} {
+    static_assert(sizeof...(ns) == Rank, "Number of ns must equal Rank");
+  }
+
+  TeamMemberType const& team_member;
+  iType const taskDims[Rank];
 };
 
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
@@ -1002,26 +1035,6 @@ struct MDTeamVectorRangeBoundariesStruct {
   // sizeof(Is) == Rank
   template <typename... Is>
   KOKKOS_INLINE_FUNCTION constexpr MDTeamVectorRangeBoundariesStruct(
-      TeamMemberType const& tm, index_type n0, index_type n1, Is... ns)
-      : team_member(tm), taskDims{n0, n1, ns...} {}
-
-  team_member_type const& team_member;
-  index_type taskDims[Rank];
-};
-
-template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
-          size_t Rank, typename iType, typename TeamMemberType>
-struct MDThreadVectorRangeBoundariesStruct {
-  static constexpr Kokkos::Iterate outer_direction = OuterDirection;
-  static constexpr Kokkos::Iterate inner_direction = InnerDirection;
-  static constexpr size_t rank                     = Rank;
-  using index_type                                 = iType;
-  using team_member_type                           = TeamMemberType;
-
-  // Is must all be convertible to iType
-  // sizeof(Is) == Rank
-  template <typename... Is>
-  KOKKOS_INLINE_FUNCTION constexpr MDThreadVectorRangeBoundariesStruct(
       TeamMemberType const& tm, index_type n0, index_type n1, Is... ns)
       : team_member(tm), taskDims{n0, n1, ns...} {}
 
