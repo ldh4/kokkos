@@ -1439,6 +1439,29 @@ parallel_scan(const Impl::ThreadVectorRangeBoundariesStruct<iType, Member>&
   }
 }
 
+// donlee
+
+template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename Closure, typename Member>
+KOKKOS_INLINE_FUNCTION std::enable_if_t<
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_scan(
+    Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
+    Closure const& closure) {
+
+  using value_type = typename Kokkos::Impl::FunctorAnalysis<
+      Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
+
+  int acc = 0;
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., acc, false); } );
+
+  acc = boundaries.thread.team_scan(acc);
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., acc, true); } );
+}
+
+// end of donlee
+
 //----------------------------------------------------------------------------
 
 template <class Member>
