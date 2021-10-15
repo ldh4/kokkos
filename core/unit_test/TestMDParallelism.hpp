@@ -817,10 +817,10 @@ struct TestMDParallelScan {
       KOKKOS_LAMBDA(const auto& team) {
         Kokkos::parallel_scan(
           Kokkos::MDTeamThreadRange(team, N0, N1),
-          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool final) {
+          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool last) {
             const DataType val = v(i,j);
             total += val;
-            if (final) v(i,j) = total;
+            if (last) v(i,j) = total;
           }
         );
       }
@@ -853,10 +853,10 @@ struct TestMDParallelScan {
       KOKKOS_LAMBDA(const auto& team) {
         Kokkos::parallel_scan(
           Kokkos::MDTeamThreadRange<Direction>(team, N0, N1),
-          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool final) {
+          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool last) {
             const DataType val = v(i,j);
             total += val;
-            if (final) v(i,j) = total;
+            if (last) v(i,j) = total;
           }
         );
       }
@@ -890,10 +890,10 @@ struct TestMDParallelScan {
       KOKKOS_LAMBDA(const auto& team) {
         Kokkos::parallel_scan(
           Kokkos::MDThreadVectorRange(team, N0, N1),
-          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool final) {
+          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool last) {
             const DataType val = v(i,j);
             total += val;
-            if (final) v(i,j) = total;
+            if (last) v(i,j) = total;
           }
         );
       }
@@ -926,10 +926,10 @@ struct TestMDParallelScan {
       KOKKOS_LAMBDA(const auto& team) {
         Kokkos::parallel_scan(
           Kokkos::MDThreadVectorRange<OuterDirection, InnerDirection>(team, N0, N1),
-          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool final) {
+          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool last) {
             const DataType val = v(i,j);
             total += val;
-            if (final) v(i,j) = total;
+            if (last) v(i,j) = total;
           }
         );
       }
@@ -964,10 +964,10 @@ struct TestMDParallelScan {
 
         Kokkos::parallel_scan(
           Kokkos::MDThreadVectorRange(team, N0, N1),
-          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool final) {
+          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool last) {
             const DataType val = v(l,i,j);
             total += val;
-            if (final) v(l,i,j) = total;
+            if (last) v(l,i,j) = total;
           }
         );
       }
@@ -1003,10 +1003,10 @@ struct TestMDParallelScan {
 
         Kokkos::parallel_scan(
           Kokkos::MDThreadVectorRange<OuterDirection,InnerDirection>(team, N0, N1),
-          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool final) {
+          KOKKOS_LAMBDA(const int& i, const int& j, DataType& total, const bool last) {
             const DataType val = v(l,i,j);
             total += val;
-            if (final) v(l,i,j) = total;
+            if (last) v(l,i,j) = total;
           }
         );
       }
