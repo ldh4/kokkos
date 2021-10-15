@@ -1471,10 +1471,56 @@ parallel_scan(
     Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
     Closure const& closure) {
 
-  using value_type = typename Kokkos::Impl::FunctorAnalysis<
-      Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
+  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
+  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
+  // TODO Check for validity
+  using ValueType = iType;
 
-  int acc = 0;
+  ValueType acc = 0;
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., acc, false); } );
+
+  acc = boundaries.thread.team_scan(acc);
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., acc, true); } );
+}
+
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, size_t Rank, typename iType,
+          typename Closure, typename Member>
+KOKKOS_INLINE_FUNCTION std::enable_if_t<
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_scan(
+    Impl::MDThreadVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Member>
+    const& boundaries, Closure const& closure) {
+
+  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
+  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
+  // TODO Check for validity
+  using ValueType = iType;
+
+  ValueType scanVal = ValueType();
+
+#ifdef KOKKOS_ENABLE_PRAGMA_IVDEP
+#pragma ivdep
+#endif
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., scanVal, true); } );
+}
+
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, size_t Rank, typename iType,
+          typename Closure, typename Member>
+KOKKOS_INLINE_FUNCTION std::enable_if_t<
+    Impl::is_host_thread_team_member<Member>::value>
+parallel_scan(
+    Impl::MDTeamVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Member>
+    const& boundaries, Closure const& closure) {
+
+  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
+  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
+  // TODO Check for validity
+  using ValueType = iType;
+
+  ValueType acc = 0;
 
   parallel_for(boundaries, [&](auto... is) { closure(is ..., acc, false); } );
 
