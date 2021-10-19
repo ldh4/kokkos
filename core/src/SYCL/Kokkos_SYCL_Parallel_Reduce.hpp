@@ -74,19 +74,16 @@ void workgroup_reduction(sycl::nd_item<dim>& item,
   for (unsigned int i = 0; i < dim; ++i) wgroup_size *= item.get_local_range(i);
 
   // Perform the actual workgroup reduction in each subgroup
-  // separately. To achieve a better memory access pattern, we use
-  // sequential addressing and a reversed loop. If the workgroup
-  // size is 8, the first element contains all the values with
-  // index%4==0, after the second one the values with index%2==0 and
-  // after the third one index%1==0, i.e., all values.
+  // separately.
   auto sg                = item.get_sub_group();
   auto* result           = &local_mem[local_id * value_count];
   const auto id_in_sg    = sg.get_local_id()[0];
   const auto local_range = std::min(sg.get_local_range()[0], wgroup_size);
-  for (unsigned int stride = local_range / 2; stride > 0; stride >>= 1) {
-    auto* tmp = sg.shuffle_down(result, stride);
+  for (unsigned int stride = 1; stride < local_range; stride <<= 1) {
     if (id_in_sg + stride < local_range)
-      ValueJoin::join(selected_reducer, result, tmp);
+      ValueJoin::join(selected_reducer, result,
+                      &local_mem[(local_id + stride) * value_count]);
+    sg.barrier();
   }
   item.barrier(sycl::access::fence_space::local_space);
 
@@ -109,11 +106,14 @@ void workgroup_reduction(sycl::nd_item<dim>& item,
       if (id_in_sg + offset < n_subgroups)
         ValueJoin::join(selected_reducer, result_,
                         &local_mem[(id_in_sg + offset) * value_count]);
+    sg.barrier();
+
     // Then, we proceed as before.
-    for (unsigned int stride = local_range / 2; stride > 0; stride >>= 1) {
-      auto* tmp = sg.shuffle_down(result_, stride);
+    for (unsigned int stride = 1; stride < local_range; stride <<= 1) {
       if (id_in_sg + stride < n_subgroups)
-        ValueJoin::join(selected_reducer, result_, tmp);
+        ValueJoin::join(selected_reducer, result_,
+                        &local_mem[(id_in_sg + stride) * value_count]);
+      sg.barrier();
     }
 
     // Finally, we copy the workgroup results back to global memory
@@ -166,7 +166,9 @@ class ParallelReduce<FunctorType, Kokkos::RangePolicy<Traits...>, ReducerType,
         m_result_ptr(v.data()),
         m_result_ptr_device_accessible(
             MemorySpaceAccess<Kokkos::Experimental::SYCLDeviceUSMSpace,
-                              typename V::memory_space>::accessible) {}
+                              typename V::memory_space>::accessible),
+        m_shared_memory_lock(
+            p.space().impl_internal_space_instance()->m_mutexScratchSpace) {}
 
   ParallelReduce(const FunctorType& f, const Policy& p,
                  const ReducerType& reducer)
@@ -177,7 +179,9 @@ class ParallelReduce<FunctorType, Kokkos::RangePolicy<Traits...>, ReducerType,
         m_result_ptr_device_accessible(
             MemorySpaceAccess<Kokkos::Experimental::SYCLDeviceUSMSpace,
                               typename ReducerType::result_view_type::
-                                  memory_space>::accessible) {}
+                                  memory_space>::accessible),
+        m_shared_memory_lock(
+            p.space().impl_internal_space_instance()->m_mutexScratchSpace) {}
 
  private:
   template <typename PolicyType, typename Functor, typename Reducer>
@@ -372,6 +376,10 @@ class ParallelReduce<FunctorType, Kokkos::RangePolicy<Traits...>, ReducerType,
   const ReducerType m_reducer;
   const pointer_type m_result_ptr;
   const bool m_result_ptr_device_accessible;
+
+  // Only let one Parallel/Scan modify the shared memory. The
+  // constructor acquires the mutex which is released in the destructor.
+  std::unique_lock<std::mutex> m_shared_memory_lock;
 };
 
 template <class FunctorType, class ReducerType, class... Traits>
@@ -425,7 +433,9 @@ class ParallelReduce<FunctorType, Kokkos::MDRangePolicy<Traits...>, ReducerType,
         m_result_ptr(v.data()),
         m_result_ptr_device_accessible(
             MemorySpaceAccess<Kokkos::Experimental::SYCLDeviceUSMSpace,
-                              typename V::memory_space>::accessible) {}
+                              typename V::memory_space>::accessible),
+        m_shared_memory_lock(
+            m_space.impl_internal_space_instance()->m_mutexScratchSpace) {}
 
   ParallelReduce(const FunctorType& f, const Policy& p,
                  const ReducerType& reducer)
@@ -437,7 +447,9 @@ class ParallelReduce<FunctorType, Kokkos::MDRangePolicy<Traits...>, ReducerType,
         m_result_ptr_device_accessible(
             MemorySpaceAccess<Kokkos::Experimental::SYCLDeviceUSMSpace,
                               typename ReducerType::result_view_type::
-                                  memory_space>::accessible) {}
+                                  memory_space>::accessible),
+        m_shared_memory_lock(
+            m_space.impl_internal_space_instance()->m_mutexScratchSpace) {}
 
  private:
   template <typename PolicyType, typename Functor, typename Reducer>
@@ -657,6 +669,10 @@ class ParallelReduce<FunctorType, Kokkos::MDRangePolicy<Traits...>, ReducerType,
   const ReducerType m_reducer;
   const pointer_type m_result_ptr;
   const bool m_result_ptr_device_accessible;
+
+  // Only let one Parallel/Scan modify the shared memory. The
+  // constructor acquires the mutex which is released in the destructor.
+  std::unique_lock<std::mutex> m_shared_memory_lock;
 };
 
 }  // namespace Impl

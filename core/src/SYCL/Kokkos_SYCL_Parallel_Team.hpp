@@ -396,6 +396,9 @@ class ParallelFor<FunctorType, Kokkos::TeamPolicy<Properties...>,
   int m_shmem_size;
   void* m_scratch_ptr[2];
   int m_scratch_size[2];
+  // Only let one ParallelFor/Reduce modify the team scratch memory. The
+  // constructor acquires the mutex which is released in the destructor.
+  std::unique_lock<std::mutex> m_scratch_lock;
 
   template <typename Functor>
   sycl::event sycl_direct_launch(const Policy& policy,
@@ -471,7 +474,10 @@ class ParallelFor<FunctorType, Kokkos::TeamPolicy<Properties...>,
         m_policy(arg_policy),
         m_league_size(arg_policy.league_size()),
         m_team_size(arg_policy.team_size()),
-        m_vector_size(arg_policy.impl_vector_length()) {
+        m_vector_size(arg_policy.impl_vector_length()),
+        m_scratch_lock(arg_policy.space()
+                           .impl_internal_space_instance()
+                           ->m_team_scratch_mutex) {
     // FIXME_SYCL optimize
     if (m_team_size < 0) m_team_size = 32;
 
@@ -551,6 +557,9 @@ class ParallelReduce<FunctorType, Kokkos::TeamPolicy<Properties...>,
   const size_type m_league_size;
   int m_team_size;
   const size_type m_vector_size;
+  // Only let one ParallelFor/Reduce modify the team scratch memory. The
+  // constructor acquires the mutex which is released in the destructor.
+  std::unique_lock<std::mutex> m_scratch_lock;
 
   template <typename PolicyType, typename Functor, typename Reducer>
   sycl::event sycl_direct_launch(const PolicyType& policy,
@@ -671,9 +680,9 @@ class ParallelReduce<FunctorType, Kokkos::TeamPolicy<Properties...>,
                 sycl::range<2>(m_team_size, m_vector_size)),
             [=](sycl::nd_item<2> item) {
 #ifdef KOKKOS_ENABLE_DEBUG
-              if (item.get_sub_group().get_local_range() %
-                      item.get_local_range(1) !=
-                  0)
+              if (first_run && item.get_sub_group().get_local_range() %
+                                       item.get_local_range(1) !=
+                                   0)
                 Kokkos::abort(
                     "The sub_group size is not divisible by the vector_size. "
                     "Choose a smaller vector_size!");
@@ -718,6 +727,9 @@ class ParallelReduce<FunctorType, Kokkos::TeamPolicy<Properties...>,
                   device_accessible_result_ptr, value_count, selected_reducer,
                   static_cast<const FunctorType&>(functor),
                   n_wgroups <= 1 && item.get_group_linear_id() == 0);
+
+              // FIXME_SYCL not quite sure why this is necessary
+              item.barrier(sycl::access::fence_space::global_space);
             });
       });
       q.submit_barrier(std::vector<sycl::event>{parallel_reduce_event});
@@ -820,7 +832,10 @@ class ParallelReduce<FunctorType, Kokkos::TeamPolicy<Properties...>,
                               typename ViewType::memory_space>::accessible),
         m_league_size(arg_policy.league_size()),
         m_team_size(arg_policy.team_size()),
-        m_vector_size(arg_policy.impl_vector_length()) {
+        m_vector_size(arg_policy.impl_vector_length()),
+        m_scratch_lock(arg_policy.space()
+                           .impl_internal_space_instance()
+                           ->m_team_scratch_mutex) {
     initialize();
   }
 
@@ -836,7 +851,10 @@ class ParallelReduce<FunctorType, Kokkos::TeamPolicy<Properties...>,
                                   memory_space>::accessible),
         m_league_size(arg_policy.league_size()),
         m_team_size(arg_policy.team_size()),
-        m_vector_size(arg_policy.impl_vector_length()) {
+        m_vector_size(arg_policy.impl_vector_length()),
+        m_scratch_lock(arg_policy.space()
+                           .impl_internal_space_instance()
+                           ->m_team_scratch_mutex) {
     initialize();
   }
 };

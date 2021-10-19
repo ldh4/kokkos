@@ -129,16 +129,6 @@ int cuda_kernel_arch() {
   return arch;
 }
 
-#ifdef KOKKOS_ENABLE_CUDA_UVM
-bool cuda_launch_blocking() {
-  const char *env = getenv("CUDA_LAUNCH_BLOCKING");
-
-  if (env == nullptr) return false;
-
-  return std::stoi(env);
-}
-#endif
-
 }  // namespace
 
 void cuda_device_synchronize(const std::string &name) {
@@ -526,15 +516,6 @@ void CudaInternal::initialize(int cuda_device_id, cudaStream_t stream,
   }
 
 #ifdef KOKKOS_ENABLE_CUDA_UVM
-  if (Kokkos::show_warnings() && !cuda_launch_blocking()) {
-    std::cerr << R"warning(
-Kokkos::Cuda::initialize WARNING: Cuda is allocating into UVMSpace by default
-                                  without setting CUDA_LAUNCH_BLOCKING=1.
-                                  The code must call Cuda().fence() after each kernel
-                                  or will likely crash when accessing data on the host.)warning"
-              << std::endl;
-  }
-
   const char *env_force_device_alloc =
       getenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC");
   bool force_device_alloc;
