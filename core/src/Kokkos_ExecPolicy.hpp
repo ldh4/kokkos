@@ -992,6 +992,15 @@ struct MDTeamThreadRangeBoundariesStruct {
   iType const threadDims[Rank];
 };
 
+template <typename T>
+struct IsMDTeamThreadRangeBoundariesStruct : std::false_type {};
+
+template <Kokkos::Iterate Direction, size_t Rank, typename iType,
+          typename TeamMemberType>
+    struct IsMDTeamThreadRangeBoundariesStruct <
+    MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, TeamMemberType>>
+    : std::true_type {};
+
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
           size_t Rank, typename iType, typename TeamMemberType>
 struct MDThreadVectorRangeBoundariesStruct {

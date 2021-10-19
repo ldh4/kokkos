@@ -131,14 +131,13 @@ struct TestMDParallelFor {
       DeferredMDTeamThreadRange const& md_team_thread_range, const int n0,
       const Ns... ns) {
     using DataType = int;
-    // using ViewType     = typename Kokkos::View<DataType***, ExecSpace>;
     using ViewType =
         typename Kokkos::View<add_pointers_t<DataType, 1 + sizeof...(ns)>,
                               ExecSpace>;
     using HostViewType = typename ViewType::HostMirror;
 
-    const int startIdx[3] = {0};
-    const int initValue   = 3;
+    const int startIdx[1 + sizeof...(ns)] = {0};
+    const int initValue                   = 3;
 
     ViewType v("v", n0, ns...);
 
@@ -147,17 +146,24 @@ struct TestMDParallelFor {
         KOKKOS_LAMBDA(const auto& team) {
           int leagueRank = team.league_rank();
 
+          // The static_assert is here because we needed the calling
+          // signature of md_team_thread_range when we have "team"
+          static_assert(Kokkos::Impl::IsMDTeamThreadRangeBoundariesStruct<
+                            decltype(md_team_thread_range(team, ns...))>::value,
+                        "md_team_thread_range(team, ns...) must return an "
+                        "MDTeamThreadRangeBoundariesStruct");
+
           Kokkos::parallel_for(
               md_team_thread_range(team, ns...),
-              KOKKOS_LAMBDA(int i, int j) { v(leagueRank, i, j) = initValue; });
+              KOKKOS_LAMBDA(auto... is) { v(leagueRank, is...) = initValue; });
         });
 
     HostViewType h_view = Kokkos::create_mirror_view(v);
     Kokkos::deep_copy(h_view, v);
 
-    // check_result("test_for_MDTeamThreadRange", h_view, startIdx,
-    // initValue);
-    check_result_3D("test_for_MDTeamThreadRange", h_view, startIdx, initValue);
+    check_result(startIdx, h_view, [&h_view, initValue](auto... is) {
+      ASSERT_EQ(initValue, h_view(is...));
+    });
   }
 
   static void test_for3_MDTeamThreadRange(const int N0, const int N1,
@@ -2600,6 +2606,27 @@ TEST(TEST_CATEGORY, MDParallelFor) {
     TestMDParallelFor<TEST_EXECSPACE>::
         test_for8_MDTeamThreadRange_with_direction<Kokkos::Iterate::Right>(
             N0, N1, N2, N3, N4, N5, N6, N7);
+  }
+
+  {
+    auto md_thread_vector_range = [](auto const& team, auto... ns) {
+      return Kokkos::MDTeamThreadRange(team, ns...);
+    };
+
+    auto md_thread_vector_range_left = [](auto const& team, auto... ns) {
+      return Kokkos::MDTeamThreadRange<Kokkos::Iterate::Left>(team, ns...);
+    };
+
+    TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
+        md_thread_vector_range, N0, N1, N2);
+    TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
+        md_thread_vector_range, N0, N1, N2, N3);
+    TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
+        md_thread_vector_range_left, N0, N1, N2);
+    TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
+        md_thread_vector_range_left, N0, N1, N2, N3);
+    TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
+        md_thread_vector_range_left, N0, N1, N2, N3, N4, N5, N6, N7);
   }
 
   {
