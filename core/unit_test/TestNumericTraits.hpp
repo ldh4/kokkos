@@ -81,6 +81,8 @@ struct FiniteMin { template <class T> using trait = Kokkos::Experimental::finite
 struct FiniteMax { template <class T> using trait = Kokkos::Experimental::finite_max<T>; };
 struct RoundError { template <class T> using trait = Kokkos::Experimental::round_error<T>; };
 struct NormMin { template <class T> using trait = Kokkos::Experimental::norm_min<T>; };
+struct DenormMin { template <class T> using trait = Kokkos::Experimental::denorm_min<T>; };
+struct ReciprocalOverflowThreshold { template <class T> using trait = Kokkos::Experimental::reciprocal_overflow_threshold<T>; };
 struct Digits { template <class T> using trait = Kokkos::Experimental::digits<T>; };
 struct Digits10 { template <class T> using trait = Kokkos::Experimental::digits10<T>; };
 struct MaxDigits10 { template <class T> using trait = Kokkos::Experimental::max_digits10<T>; };
@@ -89,6 +91,8 @@ struct MinExponent { template <class T> using trait = Kokkos::Experimental::min_
 struct MaxExponent { template <class T> using trait = Kokkos::Experimental::max_exponent<T>; };
 struct MinExponent10 { template <class T> using trait = Kokkos::Experimental::min_exponent10<T>; };
 struct MaxExponent10 { template <class T> using trait = Kokkos::Experimental::max_exponent10<T>; };
+struct QuietNaN { template <class T> using trait = Kokkos::Experimental::quiet_NaN<T>; };
+struct SignalingNaN { template <class T> using trait = Kokkos::Experimental::signaling_NaN<T>; };
 // clang-format on
 
 template <class T>
@@ -149,10 +153,22 @@ struct TestNumericTraits {
     use_on_device();
   }
 
+  KOKKOS_FUNCTION void operator()(ReciprocalOverflowThreshold, int,
+                                  int& e) const {
+    using Kokkos::Experimental::reciprocal_overflow_threshold;
+    auto const inv = 1 / reciprocal_overflow_threshold<T>::value;
+    if (inv + inv == inv && inv != 0) {
+      printf("inverse of reciprocal overflow threshold is inf\n");
+      ++e;
+    }
+    use_on_device();
+  }
+
   // clang-format off
   KOKKOS_FUNCTION void operator()(FiniteMax, int, int&) const { use_on_device(); }
   KOKKOS_FUNCTION void operator()(RoundError, int, int&) const { use_on_device(); }
   KOKKOS_FUNCTION void operator()(NormMin, int, int&) const { use_on_device(); }
+  KOKKOS_FUNCTION void operator()(DenormMin, int, int&) const { use_on_device(); }
   KOKKOS_FUNCTION void operator()(Digits, int, int&) const { use_on_device(); }
   KOKKOS_FUNCTION void operator()(Digits10, int, int&) const { use_on_device(); }
   KOKKOS_FUNCTION void operator()(MaxDigits10, int, int&) const { use_on_device(); }
@@ -162,6 +178,22 @@ struct TestNumericTraits {
   KOKKOS_FUNCTION void operator()(MinExponent10, int, int&) const { use_on_device(); }
   KOKKOS_FUNCTION void operator()(MaxExponent10, int, int&) const { use_on_device(); }
   // clang-format on
+  KOKKOS_FUNCTION void operator()(QuietNaN, int, int& e) const {
+    using Kokkos::Experimental::quiet_NaN;
+    constexpr auto nan  = quiet_NaN<T>::value;
+    constexpr auto zero = T(0);
+    e += (int)!(nan != nan);
+    e += (int)!(nan != zero);
+    use_on_device();
+  }
+  KOKKOS_FUNCTION void operator()(SignalingNaN, int, int& e) const {
+    using Kokkos::Experimental::signaling_NaN;
+    constexpr auto nan  = signaling_NaN<T>::value;
+    constexpr auto zero = T(0);
+    e += (int)!(nan != nan);
+    e += (int)!(nan != zero);
+    use_on_device();
+  }
 
   KOKKOS_FUNCTION void use_on_device() const {
 #if defined(KOKKOS_COMPILER_NVCC) || defined(KOKKOS_ENABLE_OPENMPTARGET)
@@ -222,6 +254,18 @@ TEST(TEST_CATEGORY, numeric_traits_norm_min) {
   TestNumericTraits<TEST_EXECSPACE, float, NormMin>();
   TestNumericTraits<TEST_EXECSPACE, double, NormMin>();
   TestNumericTraits<TEST_EXECSPACE, long double, NormMin>();
+}
+
+TEST(TEST_CATEGORY, numeric_traits_denorm_min) {
+  TestNumericTraits<TEST_EXECSPACE, float, DenormMin>();
+  TestNumericTraits<TEST_EXECSPACE, double, DenormMin>();
+  TestNumericTraits<TEST_EXECSPACE, long double, DenormMin>();
+}
+
+TEST(TEST_CATEGORY, numeric_traits_reciprocal_overflow_threshold) {
+  TestNumericTraits<TEST_EXECSPACE, float, ReciprocalOverflowThreshold>();
+  TestNumericTraits<TEST_EXECSPACE, double, ReciprocalOverflowThreshold>();
+  TestNumericTraits<TEST_EXECSPACE, long double, ReciprocalOverflowThreshold>();
 }
 
 TEST(TEST_CATEGORY, numeric_traits_finite_min_max) {
@@ -338,6 +382,15 @@ TEST(TEST_CATEGORY, numeric_traits_min_max_exponent10) {
   TestNumericTraits<TEST_EXECSPACE, long double, MaxExponent10>();
 }
 
+TEST(TEST_CATEGORY, numeric_traits_quiet_and_signaling_nan) {
+  TestNumericTraits<TEST_EXECSPACE, float, QuietNaN>();
+  TestNumericTraits<TEST_EXECSPACE, float, SignalingNaN>();
+  TestNumericTraits<TEST_EXECSPACE, double, QuietNaN>();
+  TestNumericTraits<TEST_EXECSPACE, double, SignalingNaN>();
+  TestNumericTraits<TEST_EXECSPACE, long double, QuietNaN>();
+  TestNumericTraits<TEST_EXECSPACE, long double, SignalingNaN>();
+}
+
 namespace NumericTraitsSFINAE {
 
 struct HasNoSpecialization {};
@@ -355,6 +408,9 @@ CHECK_TRAIT_IS_SFINAE_FRIENDLY(finite_max)
 CHECK_TRAIT_IS_SFINAE_FRIENDLY(epsilon)
 CHECK_TRAIT_IS_SFINAE_FRIENDLY(round_error)
 CHECK_TRAIT_IS_SFINAE_FRIENDLY(norm_min)
+CHECK_TRAIT_IS_SFINAE_FRIENDLY(denorm_min)
+CHECK_TRAIT_IS_SFINAE_FRIENDLY(quiet_NaN)
+CHECK_TRAIT_IS_SFINAE_FRIENDLY(signaling_NaN)
 
 CHECK_TRAIT_IS_SFINAE_FRIENDLY(digits)
 CHECK_TRAIT_IS_SFINAE_FRIENDLY(digits10)
@@ -417,6 +473,11 @@ CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(long double, epsilon);
 CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(float, round_error);
 CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(double, round_error);
 CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(long double, round_error);
+CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(float, denorm_min);
+CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(double, denorm_min);
+CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(long double, denorm_min);
+// NOTE reciprocal_overflow_threshold purposefully omitted since it does not
+// exist in std::numeric_limits
 // clang-format off
 static_assert(Kokkos::Experimental::norm_min<float      >::value == std::numeric_limits<      float>::min(), "");
 static_assert(Kokkos::Experimental::norm_min<double     >::value == std::numeric_limits<     double>::min(), "");
@@ -517,6 +578,25 @@ CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_CONSTANT(long double, max_exponent10);
 #undef CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION
 #undef CHECK_SAME_AS_NUMERIC_LIMITS_MEMBER_CONSTANT
 
+#define CHECK_NAN_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(T, TRAIT)             \
+  static_assert(Kokkos::Experimental::TRAIT<T>::value !=                       \
+                    Kokkos::Experimental::TRAIT<T>::value,                     \
+                "");                                                           \
+  static_assert(                                                               \
+      std::numeric_limits<T>::TRAIT() != std::numeric_limits<T>::TRAIT(), ""); \
+  static_assert(Kokkos::Experimental::TRAIT<T>::value !=                       \
+                    std::numeric_limits<T>::TRAIT(),                           \
+                "")
+
+CHECK_NAN_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(float, quiet_NaN);
+CHECK_NAN_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(double, quiet_NaN);
+CHECK_NAN_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(long double, quiet_NaN);
+CHECK_NAN_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(float, signaling_NaN);
+CHECK_NAN_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(double, signaling_NaN);
+CHECK_NAN_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION(long double, signaling_NaN);
+
+#undef CHECK_NAN_SAME_AS_NUMERIC_LIMITS_MEMBER_FUNCTION
+
 #define CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES(T, TRAIT)              \
   static_assert(Kokkos::Experimental::TRAIT<T const>::value ==          \
                     Kokkos::Experimental::TRAIT<T>::value,              \
@@ -555,6 +635,8 @@ CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_INTEGRAL(finite_max);
 CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(epsilon);
 CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(round_error);
 CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(norm_min);
+CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(
+    reciprocal_overflow_threshold);
 
 CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(digits);
 CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_INTEGRAL(digits);
@@ -571,3 +653,28 @@ CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(max_exponent10);
 #undef CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_INTEGRAL
 #undef CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT
 #undef CHECK_INSTANTIATED_ON_CV_QUALIFIED_TYPES
+
+#define CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES(T, TRAIT)          \
+  static_assert(Kokkos::Experimental::TRAIT<T>::value !=                \
+                    Kokkos::Experimental::TRAIT<T>::value,              \
+                "");                                                    \
+  static_assert(Kokkos::Experimental::TRAIT<T const>::value !=          \
+                    Kokkos::Experimental::TRAIT<T>::value,              \
+                "");                                                    \
+  static_assert(Kokkos::Experimental::TRAIT<T volatile>::value !=       \
+                    Kokkos::Experimental::TRAIT<T>::value,              \
+                "");                                                    \
+  static_assert(Kokkos::Experimental::TRAIT<T const volatile>::value != \
+                    Kokkos::Experimental::TRAIT<T>::value,              \
+                "")
+
+#define CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(TRAIT) \
+  CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES(float, TRAIT);              \
+  CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES(double, TRAIT);             \
+  CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES(long double, TRAIT)
+
+CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(quiet_NaN);
+CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT(signaling_NaN);
+
+#undef CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES_FLOATING_POINT
+#undef CHECK_NAN_INSTANTIATED_ON_CV_QUALIFIED_TYPES

@@ -91,7 +91,9 @@ static std::atomic<int> num_uvm_allocations(0);
 }  // namespace
 
 void DeepCopyCuda(void *dst, const void *src, size_t n) {
-  KOKKOS_IMPL_CUDA_SAFE_CALL(cudaMemcpy(dst, src, n, cudaMemcpyDefault));
+  cudaStream_t s = cuda_get_deep_copy_stream();
+  KOKKOS_IMPL_CUDA_SAFE_CALL(
+      cudaMemcpyAsync(dst, src, n, cudaMemcpyDefault, s));
 }
 
 void DeepCopyAsyncCuda(const Cuda &instance, void *dst, const void *src,
@@ -490,8 +492,13 @@ SharedAllocationRecord<Kokkos::CudaSpace, void>::~SharedAllocationRecord() {
   const char *label = nullptr;
   if (Kokkos::Profiling::profileLibraryLoaded()) {
     SharedAllocationHeader header;
+    Kokkos::Cuda exec;
     Kokkos::Impl::DeepCopy<Kokkos::CudaSpace, HostSpace>(
-        &header, RecordBase::m_alloc_ptr, sizeof(SharedAllocationHeader));
+        exec, &header, RecordBase::m_alloc_ptr, sizeof(SharedAllocationHeader));
+    exec.fence(
+        "SharedAllocationRecord<Kokkos::CudaSpace, "
+        "void>::~SharedAllocationRecord(): fence after copying header from "
+        "HostSpace");
     label = header.label();
   }
   auto alloc_size = SharedAllocationRecord<void, void>::m_alloc_size;
@@ -546,8 +553,13 @@ SharedAllocationRecord<Kokkos::CudaSpace, void>::SharedAllocationRecord(
   this->base_t::_fill_host_accessible_header_info(header, arg_label);
 
   // Copy to device memory
-  Kokkos::Impl::DeepCopy<CudaSpace, HostSpace>(RecordBase::m_alloc_ptr, &header,
-                                               sizeof(SharedAllocationHeader));
+  Kokkos::Cuda exec;
+  Kokkos::Impl::DeepCopy<CudaSpace, HostSpace>(
+      exec, RecordBase::m_alloc_ptr, &header, sizeof(SharedAllocationHeader));
+  exec.fence(
+      "SharedAllocationRecord<Kokkos::CudaSpace, "
+      "void>::SharedAllocationRecord(): fence after copying header from "
+      "HostSpace");
 }
 
 SharedAllocationRecord<Kokkos::CudaUVMSpace, void>::SharedAllocationRecord(

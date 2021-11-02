@@ -58,14 +58,15 @@ namespace Kokkos {
 namespace Impl {
 
 void DeepCopySYCL(void* dst, const void* src, size_t n) {
-  Experimental::SYCL().fence("Kokkos::Impl::DeepCopySYCL: fence before memcpy");
   Experimental::Impl::SYCLInternal::singleton().m_queue->memcpy(dst, src, n);
-  Experimental::SYCL().fence("Kokkos::Impl::DeepCopySYCL: fence after memcpy");
 }
 
 void DeepCopyAsyncSYCL(const Kokkos::Experimental::SYCL& instance, void* dst,
                        const void* src, size_t n) {
-  instance.impl_internal_space_instance()->m_queue->memcpy(dst, src, n);
+  auto event =
+      instance.impl_internal_space_instance()->m_queue->memcpy(dst, src, n);
+  instance.impl_internal_space_instance()->m_queue->submit_barrier(
+      std::vector<sycl::event>{event});
 }
 
 void DeepCopyAsyncSYCL(void* dst, const void* src, size_t n) {
@@ -251,8 +252,13 @@ SharedAllocationRecord<Kokkos::Experimental::SYCLDeviceUSMSpace, void>::
   this->base_t::_fill_host_accessible_header_info(header, label);
 
   // Copy to device memory
+  Kokkos::Experimental::SYCL exec;
   Kokkos::Impl::DeepCopy<Kokkos::Experimental::SYCLDeviceUSMSpace, HostSpace>(
-      RecordBase::m_alloc_ptr, &header, sizeof(SharedAllocationHeader));
+      exec, RecordBase::m_alloc_ptr, &header, sizeof(SharedAllocationHeader));
+  exec.fence(
+      "SharedAllocationRecord<Kokkos::Experimental::SYCLDeviceUSMSpace, "
+      "void>::SharedAllocationRecord(): fence after copying header from "
+      "HostSpace");
 }
 
 SharedAllocationRecord<Kokkos::Experimental::SYCLSharedUSMSpace, void>::
@@ -311,9 +317,14 @@ SharedAllocationRecord<Kokkos::Experimental::SYCLDeviceUSMSpace,
   const char* label = nullptr;
   if (Kokkos::Profiling::profileLibraryLoaded()) {
     SharedAllocationHeader header;
+    Kokkos::Experimental::SYCL exec;
     Kokkos::Impl::DeepCopy<Kokkos::Experimental::SYCLDeviceUSMSpace,
-                           Kokkos::HostSpace>(&header, RecordBase::m_alloc_ptr,
-                                              sizeof(SharedAllocationHeader));
+                           Kokkos::HostSpace>(
+        exec, &header, RecordBase::m_alloc_ptr, sizeof(SharedAllocationHeader));
+    exec.fence(
+        "SharedAllocationRecord<Kokkos::Experimental::SYCLDeviceUSMSpace, "
+        "void>::~SharedAllocationRecord(): fence after copying header from "
+        "HostSpace");
     label = header.label();
   }
   const auto alloc_size = SharedAllocationRecord<void, void>::m_alloc_size;
