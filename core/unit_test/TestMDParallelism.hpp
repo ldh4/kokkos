@@ -51,7 +51,7 @@
 
 namespace Test {
 
-namespace {
+namespace MDParallelism {
 
 // add_pointers adds P pointers to type T
 
@@ -76,38 +76,37 @@ struct add_pointers<T, 0> {
   using type = std::remove_reference_t<T>;
 };
 
+template <size_t RemainingRank>
+struct CheckResult {
+  static constexpr size_t remaining_rank = RemainingRank;
+
+  template <typename HostView, typename Check>
+  static void check_result(int const* startIdx, HostView const& view,
+                           Check const& check) {
+    int dim = HostView::rank - RemainingRank;
+    for (int i = 0; i < view.extent(dim); ++i) {
+      CheckResult<RemainingRank - 1>::check_result(
+          startIdx, view,
+          [j = i + startIdx[dim], &check](auto... is) { check(j, is...); });
+    }
+  }
+};
+template <>
+struct CheckResult<0> {
+  static constexpr size_t remain_rank = 0;
+
+  template <typename HostView, typename Check>
+  static void check_result(int const*, HostView const&, Check const& check) {
+    check();
+  }
+};
+
 template <typename ExecSpace>
 struct TestMDParallelFor {
   // The difference between test_for2 and test_for2_with_direction is
   // the call to MDThreadVectorRange.  test_for2 deduces all the
   // parameters for the return type, whily test_for2_with_direction
   // specifies the outer and inner directions (different code path).
-
-  template <size_t RemainingRank>
-  struct CheckResult {
-    static constexpr size_t remaining_rank = RemainingRank;
-
-    template <typename HostView, typename Check>
-    static void check_result(int const* startIdx, HostView const& view,
-                             Check const& check) {
-      int dim = HostView::rank - RemainingRank;
-      for (int i = 0; i < view.extent(dim); ++i) {
-        CheckResult<RemainingRank - 1>::check_result(
-            startIdx, view,
-            [j = i + startIdx[dim], &check](auto... is) { check(j, is...); });
-      }
-    }
-  };
-
-  template <>
-  struct CheckResult<0> {
-    static constexpr size_t remain_rank = 0;
-
-    template <typename HostView, typename Check>
-    static void check_result(int const*, HostView const&, Check const& check) {
-      check();
-    }
-  };
 
   // This is used to deduce the initial RemainingRank for CheckResult
   template <typename HostView, typename Check>
@@ -1231,7 +1230,7 @@ struct TestMDParallelism {
 #endif
 };
 
-}  // namespace
+}  // namespace MDParallelism
 
 }  // namespace Test
 
@@ -2575,6 +2574,7 @@ struct TestTeamPolicyHandleByValue {
 
 namespace Test {
 TEST(TEST_CATEGORY, MDParallelFor) {
+  using namespace MDParallelism;
   // int dims[] = {15, 16, 16, 16, 16, 16, 16, 16};
   int dims[] = {4, 4, 4, 4, 4, 4, 4, 4};
 
@@ -2682,6 +2682,7 @@ TEST(TEST_CATEGORY, MDParallelFor) {
 }
 
 TEST(TEST_CATEGORY, MDParallelReduce) {
+  using namespace MDParallelism;
   // int dims[] = {15, 16, 16, 16, 16, 16, 16, 16};
   int dims[] = {4, 4, 4, 4, 4, 4, 4, 4};
 
@@ -2726,7 +2727,7 @@ TEST(TEST_CATEGORY, MDParallelReduce) {
 }
 
 TEST(TEST_CATEGORY, MDParallelScan) {
-  // int dims[] = {15, 16, 16, 16, 16, 16, 16, 16};
+  using namespace MDParallelism;
   int dims[] = {4, 4, 4, 4, 4, 4, 4, 4};
 
   int teamSize = 4;
