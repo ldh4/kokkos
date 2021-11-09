@@ -1082,12 +1082,200 @@ KOKKOS_INLINE_FUNCTION void parallel_scan(
 
 // donlee
 
+template <size_t RemainingRank>
+struct ParallelForMDTeamThreadRangeCudaImpl {
+ private:
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION 
+  static void next_rank(Boundaries const& boundaries, Closure const& closure,
+                        typename Boundaries::index_type i) {
+    auto newClosure = [i, &closure](auto... is) { closure(i, is...); };
+    ParallelForMDTeamThreadRangeCudaImpl<RemainingRank - 1>::parallel_for_impl(
+        boundaries, newClosure);
+  }
+
+ public:
+  static constexpr size_t remaining_rank = RemainingRank;
+
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION 
+  static void parallel_for_impl(Boundaries const& boundaries,
+                                Closure const& closure) {
+    using index_type = typename Boundaries::index_type;
+    if (Boundaries::direction == Kokkos::Iterate::Right) {
+      for (index_type i = 0;
+           i < boundaries.threadDims[Boundaries::rank - RemainingRank]; ++i) {
+        next_rank(boundaries, closure, i);
+      }
+    }
+
+    if (Boundaries::direction == Kokkos::Iterate::Left) {
+      for (index_type i =
+               boundaries.threadDims[Boundaries::rank - RemainingRank];
+           i > 0;) {
+        next_rank(boundaries, closure, --i);
+      }
+    }
+  }
+};
+
+template <>
+struct ParallelForMDTeamThreadRangeCudaImpl<0> {
+  static constexpr size_t remaining_rank = 0;
+
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION 
+  static void parallel_for_impl(Boundaries const&, Closure const& closure) {
+    closure();
+  }
+};
+
 template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename Closure>
 KOKKOS_INLINE_FUNCTION 
 void parallel_for(Impl::MDTeamThreadRangeBoundariesStruct<
                   Direction, Rank, iType, Impl::CudaTeamMember> const& loop_boundaries,
                   Closure const& closure) {
+  ParallelForMDTeamThreadRangeCudaImpl<Rank>::parallel_for_impl(loop_boundaries,
+                                                                closure);
+}
 
+template <Kokkos::Iterate Direction, size_t RemainingRank>
+struct ParallelForMDThreadVectorRangeCudaImpl {
+ private:
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void next_rank(
+      Boundaries const& boundaries, Closure const& closure,
+      typename Boundaries::index_type i) {
+    auto newClosure = [i, &closure](auto... is) { closure(i, is...); };
+    ParallelForMDThreadVectorRangeCudaImpl<
+        Boundaries::inner_direction,
+        RemainingRank - 1>::parallel_for_impl(boundaries, newClosure);
+  }
+
+ public:
+  static constexpr Kokkos::Iterate direction = Direction;
+  static constexpr size_t remaining_rank     = RemainingRank;
+
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void parallel_for_impl(
+      Boundaries const& boundaries, Closure const& closure) {
+    using index_type = typename Boundaries::index_type;
+
+    if (Direction == Kokkos::Iterate::Right) {
+      for (index_type i = 0;
+           i < boundaries.taskDims[Boundaries::rank - RemainingRank]; ++i) {
+        next_rank(boundaries, closure, i);
+      }
+    }
+
+    if (Direction == Kokkos::Iterate::Left) {
+      for (index_type i = boundaries.taskDims[Boundaries::rank - RemainingRank];
+           i > 0;) {
+        next_rank(boundaries, closure, --i);
+      }
+    }
+  }
+};
+
+template <Kokkos::Iterate Direction>
+struct ParallelForMDThreadVectorRangeCudaImpl<Direction, 0> {
+  static constexpr Kokkos::Iterate direction = Direction;
+  static constexpr size_t remaining_rank     = 0;
+
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void parallel_for_impl(Boundaries const&,
+                                                       Closure const& closure) {
+    closure();
+  }
+};
+
+template <Kokkos::Iterate outer_direction, Kokkos::Iterate inner_direction,
+          size_t Rank, typename iType, typename Closure>
+KOKKOS_INLINE_FUNCTION
+void parallel_for(Impl::MDThreadVectorRangeBoundariesStruct<
+                  outer_direction, inner_direction, Rank, iType,
+                  Impl::CudaTeamMember> const& boundaries,
+                 Closure const& closure) {
+  static_assert(outer_direction == Kokkos::Iterate::Left ||
+                    outer_direction == Kokkos::Iterate::Right,
+                "outer_direction must be Left or Right");
+  static_assert(inner_direction == Kokkos::Iterate::Left ||
+                    inner_direction == Kokkos::Iterate::Right,
+                "inner_direction must be Left or Right");
+
+  ParallelForMDThreadVectorRangeCudaImpl<outer_direction,
+                                         Rank>::parallel_for_impl(boundaries,
+                                                                  closure);
+}
+
+template <Kokkos::Iterate Direction, size_t RemainingRank>
+struct ParallelForMDTeamVectorRangeCudaImpl {
+ private:
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void next_rank(
+      Boundaries const& boundaries, Closure const& closure,
+      typename Boundaries::index_type i) {
+    auto newClosure = [i, &closure](auto... is) { closure(i, is...); };
+    ParallelForMDTeamVectorRangeCudaImpl<Boundaries::inner_direction,
+                                         RemainingRank -
+                                             1>::parallel_for_impl(boundaries,
+                                                                   newClosure);
+  }
+
+ public:
+  static constexpr Kokkos::Iterate direction = Direction;
+  static constexpr size_t remaining_rank     = RemainingRank;
+
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void parallel_for_impl(
+      Boundaries const& boundaries, Closure const& closure) {
+    using index_type = typename Boundaries::index_type;
+
+    if (Direction == Kokkos::Iterate::Right) {
+      for (index_type i = 0;
+           i < boundaries.taskDims[Boundaries::rank - RemainingRank]; ++i) {
+        next_rank(boundaries, closure, i);
+      }
+    }
+
+    if (Direction == Kokkos::Iterate::Left) {
+      for (index_type i = boundaries.taskDims[Boundaries::rank - RemainingRank];
+           i > 0;) {
+        next_rank(boundaries, closure, --i);
+      }
+    }
+  }
+};
+
+template <Kokkos::Iterate Direction>
+struct ParallelForMDTeamVectorRangeCudaImpl<Direction, 0> {
+  static constexpr Kokkos::Iterate direction = Direction;
+  static constexpr size_t remaining_rank     = 0;
+
+  template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION static void parallel_for_impl(Boundaries const&,
+                                                       Closure const& closure) {
+    closure();
+  }
+};
+
+template <Kokkos::Iterate outer_direction, Kokkos::Iterate inner_direction,
+          size_t Rank, typename iType, typename Closure>
+KOKKOS_INLINE_FUNCTION
+void parallel_for(Impl::MDTeamVectorRangeBoundariesStruct<
+                  outer_direction, inner_direction, Rank, iType,
+                  Impl::CudaTeamMember> const& boundaries,
+                 Closure const& closure) {
+  static_assert(outer_direction == Kokkos::Iterate::Left ||
+                    outer_direction == Kokkos::Iterate::Right,
+                "outer_direction must be Left or Right");
+  static_assert(inner_direction == Kokkos::Iterate::Left ||
+                    inner_direction == Kokkos::Iterate::Right,
+                "inner_direction must be Left or Right");
+
+  ParallelForMDTeamVectorRangeCudaImpl<outer_direction,
+                                       Rank>::parallel_for_impl(boundaries,
+                                                                closure);
 }
 
 template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename ValueType, typename Closure>
