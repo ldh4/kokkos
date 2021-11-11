@@ -918,8 +918,8 @@ template <
     typename = std::enable_if_t<Impl::is_thread_team_member<Member>::value>>
 KOKKOS_INLINE_FUNCTION auto MDTeamVectorRange(Member const& member,
                                               Ns&&... ns) {
-  return MDThreadVectorRange<Kokkos::Iterate::Default,
-                             Kokkos::Iterate::Default>(
+  return MDTeamVectorRange<Kokkos::Iterate::Default,
+                           Kokkos::Iterate::Default>(
       member, static_cast<Ns&&>(ns)...);
 }
 
@@ -1466,7 +1466,6 @@ parallel_scan(const Impl::ThreadVectorRangeBoundariesStruct<iType, Member>&
 }
 
 // donlee
-
 template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename Closure, typename Member>
 KOKKOS_INLINE_FUNCTION std::enable_if_t<
     Impl::is_host_thread_team_member<Member>::value>
@@ -1474,10 +1473,12 @@ parallel_scan(
     Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
     Closure const& closure) {
 
-  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
-  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
+  
+
+  using ValueType = typename Kokkos::Implkkkk::FunctorAnalysis<
+      Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
   // TODO Check for validity
-  using ValueType = iType;
+  // using ValueType = iType;
 
   ValueType acc = 0;
 

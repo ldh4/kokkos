@@ -659,8 +659,8 @@ KOKKOS_INLINE_FUNCTION auto MDTeamVectorRange(Impl::CudaTeamMember const& member
 template <typename... Ns>
 KOKKOS_INLINE_FUNCTION auto MDTeamVectorRange(Impl::CudaTeamMember const& member,
                                               Ns&&... ns) {
-  return MDThreadVectorRange<Kokkos::Iterate::Default,
-                             Kokkos::Iterate::Default>(
+  return MDTeamVectorRange<Kokkos::Iterate::Default,
+                           Kokkos::Iterate::Default>(
       member, static_cast<Ns&&>(ns)...);
 }
 
@@ -1316,7 +1316,9 @@ KOKKOS_INLINE_FUNCTION
   typename Reducer::value_type value;
   reducer.init(value);
 
-  parallel_for(boundaries, [&](auto... is) { closure(is..., value); });
+  parallel_for(boundaries, [&](auto... is) { closure(is..., reducer.reference()); });
+
+  Impl::CudaTeamMember::vector_reduce(reducer);
 }
 
 template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
@@ -1328,8 +1330,39 @@ KOKKOS_INLINE_FUNCTION
                         Impl::CudaTeamMember> const& boundaries,
                     Closure const& closure, ValueType& result) {
   result = ValueType();
+  Sum<ValueType> reducer(result);
 
-  parallel_for(boundaries, [&](auto... is) { closure(is..., result); });
+  parallel_reduce(boundaries, closure, reducer);
+}
+
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, size_t Rank,
+          typename iType, typename Closure, typename Reducer>
+KOKKOS_INLINE_FUNCTION std::enable_if_t<
+    Kokkos::is_reducer<Reducer>::value>
+parallel_reduce(
+    Impl::MDTeamVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Impl::CudaTeamMember> const&
+    boundaries, Closure const& closure, Reducer const& reducer) {
+
+  typename Reducer::value_type value;
+  reducer.init(value);
+
+  parallel_for(boundaries, [&](auto... is) { closure(is ..., value); } );
+
+  boundaries.team_member.vector_reduce(reducer, value);
+  boundaries.team_member.team_reduce(reducer, value);
+}
+
+template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection, size_t Rank,
+          typename iType, typename Closure, typename ValueType>
+KOKKOS_INLINE_FUNCTION std::enable_if_t<
+    !Kokkos::is_reducer<ValueType>::value>
+parallel_reduce(
+    Impl::MDTeamVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Impl::CudaTeamMember> const&
+    boundaries, Closure const& closure, ValueType& result) {
+
+  Sum<ValueType> reducer(result);
+
+  parallel_reduce(boundaries, closure, reducer);
 }
 
 // end of donlee
