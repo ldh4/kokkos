@@ -918,8 +918,8 @@ template <
     typename = std::enable_if_t<Impl::is_thread_team_member<Member>::value>>
 KOKKOS_INLINE_FUNCTION auto MDTeamVectorRange(Member const& member,
                                               Ns&&... ns) {
-  return MDThreadVectorRange<Kokkos::Iterate::Default,
-                             Kokkos::Iterate::Default>(
+  return MDTeamVectorRange<Kokkos::Iterate::Default,
+                           Kokkos::Iterate::Default>(
       member, static_cast<Ns&&>(ns)...);
 }
 
@@ -999,6 +999,7 @@ template <size_t RemainingRank>
 struct ParallelForMDTeamThreadRangeHostImpl {
  private:
   template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION 
   static void next_rank(Boundaries const& boundaries, Closure const& closure,
                         typename Boundaries::index_type i) {
     auto newClosure = [i, &closure](auto... is) { closure(i, is...); };
@@ -1010,6 +1011,7 @@ struct ParallelForMDTeamThreadRangeHostImpl {
   static constexpr size_t remaining_rank = RemainingRank;
 
   template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION 
   static void parallel_for_impl(Boundaries const& boundaries,
                                 Closure const& closure) {
     using index_type = typename Boundaries::index_type;
@@ -1035,6 +1037,7 @@ struct ParallelForMDTeamThreadRangeHostImpl<0> {
   static constexpr size_t remaining_rank = 0;
 
   template <typename Boundaries, typename Closure>
+  KOKKOS_INLINE_FUNCTION 
   static void parallel_for_impl(Boundaries const&, Closure const& closure) {
     closure();
   }
@@ -1042,8 +1045,8 @@ struct ParallelForMDTeamThreadRangeHostImpl<0> {
 
 template <Kokkos::Iterate direction, size_t Rank, typename iType,
           typename TeamMemberType, typename Closure>
-KOKKOS_INLINE_FUNCTION typename std::enable_if<
-    Impl::is_host_thread_team_member<TeamMemberType>::value>::type
+KOKKOS_INLINE_FUNCTION std::enable_if_t<
+    Impl::is_host_thread_team_member<TeamMemberType>::value>
 parallel_for(Impl::MDTeamThreadRangeBoundariesStruct<
                  direction, Rank, iType, TeamMemberType> const& loop_boundaries,
              Closure const& closure) {
@@ -1463,7 +1466,6 @@ parallel_scan(const Impl::ThreadVectorRangeBoundariesStruct<iType, Member>&
 }
 
 // donlee
-
 template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename Closure, typename Member>
 KOKKOS_INLINE_FUNCTION std::enable_if_t<
     Impl::is_host_thread_team_member<Member>::value>
@@ -1471,10 +1473,8 @@ parallel_scan(
     Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
     Closure const& closure) {
 
-  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
-  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
-  // TODO Check for validity
-  using ValueType = iType;
+  using ValueType = typename Kokkos::Impl::FunctorAnalysis<
+      Kokkos::Impl::FunctorPatternInterface::MDSCAN, void, Closure>::value_type;
 
   ValueType acc = 0;
 
@@ -1493,10 +1493,8 @@ parallel_scan(
     Impl::MDThreadVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Member>
     const& boundaries, Closure const& closure) {
 
-  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
-  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
-  // TODO Check for validity
-  using ValueType = iType;
+  using ValueType = typename Kokkos::Impl::FunctorAnalysis<
+      Kokkos::Impl::FunctorPatternInterface::MDSCAN, void, Closure>::value_type;
 
   ValueType scanVal = ValueType();
 
@@ -1515,10 +1513,8 @@ parallel_scan(
     Impl::MDTeamVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Member>
     const& boundaries, Closure const& closure) {
 
-  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
-  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
-  // TODO Check for validity
-  using ValueType = iType;
+  using ValueType = typename Kokkos::Impl::FunctorAnalysis<
+      Kokkos::Impl::FunctorPatternInterface::MDSCAN, void, Closure>::value_type;
 
   ValueType acc = 0;
 

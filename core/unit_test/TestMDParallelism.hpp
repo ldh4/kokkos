@@ -108,6 +108,7 @@ struct TestMDParallelFor {
   // parameters for the return type, whily test_for2_with_direction
   // specifies the outer and inner directions (different code path).
 
+#ifdef FOUND_CUDA_WORKAROUND
   // This is used to deduce the initial RemainingRank for CheckResult
   template <typename HostView, typename Check>
   static void check_result(int const* startIdx, HostView const& view,
@@ -184,6 +185,62 @@ struct TestMDParallelFor {
         },
         N0, N1, N2);
   }
+#endif //FOUND_CUDA_WORKAROUND
+
+  template <typename HostViewType>
+  static void check_result_3D(std::string testName, HostViewType h_view,
+                              const int startIdx[3], int expectedValue) {
+    int counter = 0;
+    int dim     = Kokkos::rank(h_view);
+
+    for (int i = startIdx[0]; i < h_view.extent(0); ++i) {
+      for (int j = startIdx[1]; j < h_view.extent(1); ++j) {
+        for (int k = startIdx[2]; k < h_view.extent(2); ++k) {
+          if (h_view(i, j, k) == expectedValue) {
+            ++counter;
+          }
+        }
+      }
+    }
+
+    int expectedCounter = 1;
+    for (int i = 0; i != h_view.rank; ++i) expectedCounter *= h_view.extent(i);
+
+    ASSERT_EQ(expectedCounter, counter);
+  }
+
+  static void test_for3_MDTeamThreadRange(const int N0, const int N1,
+                                          const int N2) {
+    using DataType     = int;
+    using ViewType     = typename Kokkos::View<DataType***, ExecSpace>;
+    using HostViewType = typename ViewType::HostMirror;
+    using TeamType     = typename Kokkos::TeamPolicy<ExecSpace>::member_type;
+
+    const int startIdx[3] = {0};
+    const int initValue   = 3;
+
+    ViewType v("v", N0, N1, N2);
+
+    Kokkos::parallel_for(
+        Kokkos::TeamPolicy<ExecSpace>(N0, Kokkos::AUTO),
+        KOKKOS_LAMBDA(const TeamType& team) {
+          int leagueRank = team.league_rank();
+
+          auto teamRange = Kokkos::MDTeamThreadRange(team, N1, N2);
+
+          Kokkos::parallel_for(
+            teamRange,
+            [=](int i, int j) {
+              v(leagueRank, i, j) = initValue;
+            });
+        }
+    );
+
+    HostViewType h_view = Kokkos::create_mirror_view(v);
+    Kokkos::deep_copy(h_view, v);
+
+    check_result_3D("test_for3_MDTeamThreadRange", h_view, startIdx, initValue);
+  }
 
   template <typename HostViewType>
   static void check_result_8D(std::string testName, HostViewType h_view,
@@ -224,6 +281,7 @@ struct TestMDParallelFor {
     using DataType     = int;
     using ViewType     = typename Kokkos::View<DataType********, ExecSpace>;
     using HostViewType = typename ViewType::HostMirror;
+    using TeamType     = typename Kokkos::TeamPolicy<ExecSpace>::member_type;
 
     const int startIdx[8] = {0};
     const int initValue   = 3;
@@ -232,12 +290,12 @@ struct TestMDParallelFor {
 
     Kokkos::parallel_for(
         Kokkos::TeamPolicy<ExecSpace>(N0, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const auto& team) {
+        KOKKOS_LAMBDA(const TeamType& team) {
           int leagueRank = team.league_rank();
 
           Kokkos::parallel_for(
               Kokkos::MDTeamThreadRange(team, N1, N2, N3, N4, N5, N6, N7),
-              KOKKOS_LAMBDA(int i, int j, int k, int l, int m, int n, int o) {
+              [=](int i, int j, int k, int l, int m, int n, int o) {
                 v(leagueRank, i, j, k, l, m, n, o) = initValue;
               });
         });
@@ -248,42 +306,43 @@ struct TestMDParallelFor {
     check_result_8D("test_for8_MDTeamThreadRange", h_view, startIdx, initValue);
   }
 
-  template <Kokkos::Iterate Direction>
-  static void test_for8_MDTeamThreadRange_with_direction(
-      const int N0, const int N1, const int N2, const int N3, const int N4,
-      const int N5, const int N6, const int N7) {
-    using DataType     = int;
-    using ViewType     = typename Kokkos::View<DataType********, ExecSpace>;
-    using HostViewType = typename ViewType::HostMirror;
+  // template <Kokkos::Iterate Direction>
+  // static void test_for8_MDTeamThreadRange_with_direction(
+  //     const int N0, const int N1, const int N2, const int N3, const int N4,
+  //     const int N5, const int N6, const int N7) {
+  //   using DataType     = int;
+  //   using ViewType     = typename Kokkos::View<DataType********, ExecSpace>;
+  //   using HostViewType = typename ViewType::HostMirror;
 
-    const int startIdx[8] = {0};
-    const int initValue   = 3;
+  //   const int startIdx[8] = {0};
+  //   const int initValue   = 3;
 
-    ViewType v("v", N0, N1, N2, N3, N4, N5, N6, N7);
+  //   ViewType v("v", N0, N1, N2, N3, N4, N5, N6, N7);
 
-    Kokkos::parallel_for(
-        Kokkos::TeamPolicy<ExecSpace>(N0, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const auto& team) {
-          int leagueRank = team.league_rank();
+  //   Kokkos::parallel_for(
+  //       Kokkos::TeamPolicy<ExecSpace>(N0, Kokkos::AUTO),
+  //       KOKKOS_LAMBDA(const auto& team) {
+  //         int leagueRank = team.league_rank();
 
-          Kokkos::parallel_for(
-              Kokkos::MDTeamThreadRange<Direction>(team, N1, N2, N3, N4, N5, N6,
-                                                   N7),
-              KOKKOS_LAMBDA(int i, int j, int k, int l, int m, int n, int o) {
-                v(leagueRank, i, j, k, l, m, n, o) = initValue;
-              });
-        });
+  //         Kokkos::parallel_for(
+  //             Kokkos::MDTeamThreadRange<Direction>(team, N1, N2, N3, N4, N5, N6,
+  //                                                  N7),
+  //             KOKKOS_LAMBDA(int i, int j, int k, int l, int m, int n, int o) {
+  //               v(leagueRank, i, j, k, l, m, n, o) = initValue;
+  //             });
+  //       });
 
-    HostViewType h_view = Kokkos::create_mirror_view(v);
-    Kokkos::deep_copy(h_view, v);
+  //   HostViewType h_view = Kokkos::create_mirror_view(v);
+  //   Kokkos::deep_copy(h_view, v);
 
-    check_result_8D("test_for8_MDTeamThreadRange", h_view, startIdx, initValue);
-  }
+  //   check_result_8D("test_for8_MDTeamThreadRange", h_view, startIdx, initValue);
+  // }
 
   static void test_for2_MDThreadVectorRange(const int N0, const int N1) {
     using DataType     = int;
     using ViewType     = typename Kokkos::View<DataType**, ExecSpace>;
     using HostViewType = typename ViewType::HostMirror;
+    using TeamType     = typename Kokkos::TeamPolicy<ExecSpace>::member_type;
 
     const int s0 = 0;
     const int s1 = 0;
@@ -292,10 +351,10 @@ struct TestMDParallelFor {
 
     Kokkos::parallel_for(
         Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const auto& team) {
+        KOKKOS_LAMBDA(const TeamType& team) {
           Kokkos::parallel_for(
               Kokkos::MDThreadVectorRange(team, N0, N1),
-              KOKKOS_LAMBDA(int i, int j) { v(i, j) = 3; });
+              [=](int i, int j) { v(i, j) = 3; });
         });
 
     HostViewType h_view = Kokkos::create_mirror_view(v);
@@ -320,6 +379,7 @@ struct TestMDParallelFor {
     ASSERT_EQ(counter, 0);
   }
 
+#ifdef FOUND_CUDA_WORKAROUND
   static void test_for8_MDThreadVectorRange(const int N0, const int N1,
                                             const int N2, const int N3,
                                             const int N4, const int N5,
@@ -477,12 +537,14 @@ struct TestMDParallelFor {
 
     ASSERT_EQ(counter, 0);
   }
+#endif
 
   static void test_for2_MDTeamVectorRange(const int numTeams, const int N0,
                                           const int N1) {
     using DataType     = int;
     using ViewType     = typename Kokkos::View<DataType***, ExecSpace>;
     using HostViewType = typename ViewType::HostMirror;
+    using TeamType     = typename Kokkos::TeamPolicy<ExecSpace>::member_type;
 
     const int s0 = 0;
     const int s1 = 0;
@@ -492,11 +554,11 @@ struct TestMDParallelFor {
 
     Kokkos::parallel_for(
         Kokkos::TeamPolicy<ExecSpace>(numTeams, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const auto& team) {
+        KOKKOS_LAMBDA(const TeamType& team) {
           int i = team.league_rank();
           Kokkos::parallel_for(
               Kokkos::MDTeamVectorRange(team, N0, N1),
-              KOKKOS_LAMBDA(int j, int k) { v(i, j, k) = 3; });
+              [=](int j, int k) { v(i, j, k) = 3; });
         });
 
     HostViewType h_view = Kokkos::create_mirror_view(v);
@@ -517,6 +579,7 @@ struct TestMDParallelFor {
     ASSERT_EQ(counter, expectedTotalCounter);
   }
 
+#ifdef FOUND_CUDA_WORKAROUND
   template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection>
   static void test_for2_MDTeamVectorRange_with_direction(const int numTeams,
                                                          const int N0,
@@ -604,41 +667,141 @@ struct TestMDParallelFor {
 
     ASSERT_EQ(counter, 0);
   }
+#endif
 };
 
 template <typename ExecSpace>
 struct TestMDParallelReduce {
+  using TeamType = typename Kokkos::TeamPolicy<ExecSpace>::member_type;
+
   static void test_reduce2_MDTeamThreadRange(const int N0, const int N1) {
     using DataType     = int;
     using ViewType     = typename Kokkos::View<DataType**, ExecSpace>;
     using HostViewType = typename ViewType::HostMirror;
 
+    int leagueSize = 1;
+    int teamSize = 1;
+
     ViewType v("v", N0, N1);
 
     Kokkos::parallel_for(
         Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {N0, N1}),
-        KOKKOS_LAMBDA(const auto& i, const auto& j) { v(i, j) = 3; });
+        KOKKOS_LAMBDA(const int& i, const int& j) { v(i, j) = 3; });
 
-    int totalSum = 0;
+    using IntViewType     = typename Kokkos::View<int*, ExecSpace>;
+    using HostIntViewType = typename IntViewType::HostMirror;
+
+    IntViewType sharedArray("t", leagueSize);
 
     Kokkos::parallel_for(
-        Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
-        [=, &totalSum](const auto& team) {
+        Kokkos::TeamPolicy<ExecSpace>(leagueSize, teamSize),
+        KOKKOS_LAMBDA(const TeamType& team) {
+
+          auto leagueRank = team.league_rank();
           int teamSum = 0;
 
           Kokkos::parallel_reduce(
               Kokkos::MDTeamThreadRange(team, N0, N1),
-              KOKKOS_LAMBDA(const int& i, const int& j, int& threadSum) {
+              [=](const int& i, const int& j, int& threadSum) {
                 threadSum += v(i, j);
               },
               teamSum);
 
-          totalSum = teamSum;
-        });
+          Kokkos::single(Kokkos::PerTeam(team), [&] { sharedArray(leagueRank) += teamSum; });
+        }
+    );
 
-    ASSERT_EQ(totalSum, 3 * N0 * N1);
+    auto h_sharedArray = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), sharedArray);
+
+    ASSERT_EQ(h_sharedArray(0), 3 * N0 * N1);
   }
 
+  static void test_reduce2_MDThreadVectorRange(const int N0, const int N1) {
+    using DataType     = int;
+    using ViewType     = typename Kokkos::View<DataType**, ExecSpace>;
+    using HostViewType = typename ViewType::HostMirror;
+
+    int leagueSize = 1;
+    int teamSize = 1;
+
+    ViewType v("v", N0, N1);
+
+    Kokkos::parallel_for(
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {N0, N1}),
+        KOKKOS_LAMBDA(const int& i, const int& j) { v(i, j) = 3; });
+
+    using IntViewType     = typename Kokkos::View<int*, ExecSpace>;
+    using HostIntViewType = typename IntViewType::HostMirror;
+
+    IntViewType sharedArray("t", leagueSize);
+
+    Kokkos::parallel_for(
+        Kokkos::TeamPolicy<ExecSpace>(leagueSize, teamSize),
+        KOKKOS_LAMBDA(const TeamType& team) {
+
+          auto leagueRank = team.league_rank();
+          int teamSum = 0;
+
+          Kokkos::parallel_reduce(
+              Kokkos::MDThreadVectorRange(team, N0, N1),
+              [=](const int& i, const int& j, int& threadSum) {
+                threadSum += v(i, j);
+              },
+              teamSum);
+
+          Kokkos::single(Kokkos::PerTeam(team), [&] { sharedArray(leagueRank) += teamSum; });
+        }
+    );
+
+    auto h_sharedArray = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), sharedArray);
+
+    ASSERT_EQ(h_sharedArray(0), 3 * N0 * N1);
+  }
+
+  static void test_reduce2_MDTeamVectorRange(const int N0, const int N1) {
+    using DataType     = int;
+    using ViewType     = typename Kokkos::View<DataType**, ExecSpace>;
+    using HostViewType = typename ViewType::HostMirror;
+
+    int leagueSize = 1;
+    int teamSize = 1;
+
+    ViewType v("v", N0, N1);
+
+    Kokkos::parallel_for(
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {N0, N1}),
+        KOKKOS_LAMBDA(const int& i, const int& j) { v(i, j) = 3; });
+
+    using IntViewType     = typename Kokkos::View<int*, ExecSpace>;
+    using HostIntViewType = typename IntViewType::HostMirror;
+
+    IntViewType sharedArray("t", leagueSize);
+
+    Kokkos::parallel_for(
+        Kokkos::TeamPolicy<ExecSpace>(leagueSize, teamSize),
+        KOKKOS_LAMBDA(const TeamType& team) {
+
+          auto leagueRank = team.league_rank();
+          int teamSum = 0;
+
+          Kokkos::parallel_reduce(
+              Kokkos::MDTeamVectorRange(team, N0, N1),
+              [=](const int& i, const int& j, int& threadSum) {
+                threadSum += v(i, j);
+              },
+              teamSum);
+
+          Kokkos::single(Kokkos::PerTeam(team), [&] { sharedArray(leagueRank) += teamSum; });
+        }
+    );
+
+    auto h_sharedArray = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), sharedArray);
+
+    //FIXME h_sharedArray should be 2D?
+    ASSERT_EQ(h_sharedArray(0), 3 * N0 * N1);
+  }
+
+#ifdef FOUND_CUDA_WORKAROUND
   template <Kokkos::Iterate Direction>
   static void test_reduce2_MDTeamThreadRange_with_direction(const int N0,
                                                             const int N1) {
@@ -661,37 +824,6 @@ struct TestMDParallelReduce {
 
           Kokkos::parallel_reduce(
               Kokkos::MDTeamThreadRange<Direction>(team, N0, N1),
-              KOKKOS_LAMBDA(const int& i, const int& j, int& threadSum) {
-                threadSum += v(i, j);
-              },
-              teamSum);
-
-          totalSum = teamSum;
-        });
-
-    ASSERT_EQ(totalSum, 3 * N0 * N1);
-  }
-
-  static void test_reduce2_MDThreadVectorRange(const int N0, const int N1) {
-    using DataType     = int;
-    using ViewType     = typename Kokkos::View<DataType**, ExecSpace>;
-    using HostViewType = typename ViewType::HostMirror;
-
-    ViewType v("v", N0, N1);
-
-    Kokkos::parallel_for(
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {N0, N1}),
-        KOKKOS_LAMBDA(const auto& i, const auto& j) { v(i, j) = 3; });
-
-    int totalSum = 0;
-
-    Kokkos::parallel_for(
-        Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
-        [=, &totalSum](const auto& team) {
-          int teamSum = 0;
-
-          Kokkos::parallel_reduce(
-              Kokkos::MDThreadVectorRange(team, N0, N1),
               KOKKOS_LAMBDA(const int& i, const int& j, int& threadSum) {
                 threadSum += v(i, j);
               },
@@ -735,48 +867,6 @@ struct TestMDParallelReduce {
         });
 
     ASSERT_EQ(totalSum, 3 * N0 * N1);
-  }
-
-  static void test_reduce3_MDTeamVectorRange(const int teamSize, const int N0,
-                                             const int N1) {
-    using DataType           = int;
-    using ViewType           = typename Kokkos::View<DataType***, ExecSpace>;
-    using ResultViewType     = typename Kokkos::View<DataType*, ExecSpace>;
-    using ResultHostViewType = typename ResultViewType::HostMirror;
-
-    ViewType v("v", teamSize, N0, N1);
-    ResultViewType r("r", teamSize);
-
-    Kokkos::parallel_for(
-        Kokkos::MDRangePolicy<Kokkos::Rank<3>>({0, 0, 0}, {teamSize, N0, N1}),
-        KOKKOS_LAMBDA(const auto& l, const auto& i, const auto& j) {
-          v(l, i, j) = 3;
-        });
-
-    Kokkos::parallel_for(
-        Kokkos::TeamPolicy<ExecSpace>(teamSize, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const auto& team) {
-          int l       = team.league_rank();
-          int teamSum = 0;
-
-          Kokkos::parallel_reduce(
-              Kokkos::MDTeamVectorRange(team, N0, N1),
-              KOKKOS_LAMBDA(const int& i, const int& j, int& threadSum) {
-                threadSum += v(l, i, j);
-              },
-              teamSum);
-
-          r(l) = teamSum;
-        });
-
-    auto hostView = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), r);
-
-    int total = 0;
-    for (int i = 0; i < r.extent(0); ++i) {
-      total += r(i);
-    }
-
-    ASSERT_EQ(total, 3 * teamSize * N0 * N1);
   }
 
   template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection>
@@ -823,10 +913,14 @@ struct TestMDParallelReduce {
 
     ASSERT_EQ(total, 3 * teamSize * N0 * N1);
   }
+#endif
 };
 
 template <typename ExecSpace>
 struct TestMDParallelScan {
+  using TeamType = typename Kokkos::TeamPolicy<ExecSpace>::member_type;
+
+#ifdef FOUND_CUDA_WORKAROUND
   static void test_scan2_MDTeamThreadRange(const int& N0, const int& N1) {
     using DataType     = int;
     using ViewType     = typename Kokkos::View<DataType**, ExecSpace>;
@@ -836,14 +930,15 @@ struct TestMDParallelScan {
 
     Kokkos::parallel_for(
         Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {N0, N1}),
-        KOKKOS_LAMBDA(const auto& i, const auto& j) { v(i, j) = 3; });
+        KOKKOS_LAMBDA(const int& i, const int& j) { v(i, j) = 3; }
+    );
 
     Kokkos::parallel_for(
         Kokkos::TeamPolicy<ExecSpace>(1, Kokkos::AUTO),
-        KOKKOS_LAMBDA(const auto& team) {
+        KOKKOS_LAMBDA(const TeamType& team) {
           Kokkos::parallel_scan(
               Kokkos::MDTeamThreadRange(team, N0, N1),
-              KOKKOS_LAMBDA(const int& i, const int& j, DataType& total,
+              [=](const int& i, const int& j, DataType& total,
                             const bool last) {
                 const DataType val = v(i, j);
                 total += val;
@@ -1039,6 +1134,7 @@ struct TestMDParallelScan {
         (InnerDirection == Kokkos::Iterate::Left) ? 0 : hostView.extent(2) - 1;
     ASSERT_EQ(hostView(lastD1, lastD2, lastD3), 3 * N0 * N1);
   }
+#endif // FOUND_CUDA_WORKAROUND
 };
 
 template <class ExecSpace, class ScheduleType>
@@ -2590,6 +2686,16 @@ TEST(TEST_CATEGORY, MDParallelFor) {
 
   {
     TestMDParallelFor<TEST_EXECSPACE>::test_for3_MDTeamThreadRange(N0, N1, N2);
+    TestMDParallelFor<TEST_EXECSPACE>::test_for8_MDTeamThreadRange(N0, N1, N2, N3, N4, N5, N6, N7);
+
+    TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDThreadVectorRange(N0, N1);
+    TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDTeamVectorRange(teamSize, N0,
+                                                                   N1);
+  }
+
+#if 0
+  {
+    TestMDParallelFor<TEST_EXECSPACE>::test_for3_MDTeamThreadRange(N0, N1, N2);
     TestMDParallelFor<TEST_EXECSPACE>::
         test_for3_MDTeamThreadRange_with_direction<Kokkos::Iterate::Left>(
             N0, N1, N2);
@@ -2679,6 +2785,8 @@ TEST(TEST_CATEGORY, MDParallelFor) {
                                                    Kokkos::Iterate::Left>(
             teamSize, N0, N1);
   }
+#endif // if 0
+
 }
 
 TEST(TEST_CATEGORY, MDParallelReduce) {
@@ -2696,6 +2804,17 @@ TEST(TEST_CATEGORY, MDParallelReduce) {
   int N6       = dims[6];
   int N7       = dims[7];
 
+{
+    TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDTeamThreadRange(N0,
+                                                                         N1);
+    TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDThreadVectorRange(N0,
+                                                                           N1);
+    TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDTeamVectorRange(N0,
+                                                                         N1);
+}
+
+
+#if 0
   {
     TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDTeamThreadRange(N0,
                                                                          N1);
@@ -2724,6 +2843,8 @@ TEST(TEST_CATEGORY, MDParallelReduce) {
                                                       Kokkos::Iterate::Left>(
             teamSize, N0, N1);
   }
+
+#endif
 }
 
 TEST(TEST_CATEGORY, MDParallelScan) {
@@ -2739,6 +2860,11 @@ TEST(TEST_CATEGORY, MDParallelScan) {
   int N5       = dims[5];
   int N6       = dims[6];
   int N7       = dims[7];
+
+#if 0
+  {
+    TestMDParallelScan<TEST_EXECSPACE>::test_scan2_MDTeamThreadRange(N0, N1);
+  }
 
   {
     TestMDParallelScan<TEST_EXECSPACE>::test_scan2_MDTeamThreadRange(N0, N1);
@@ -2769,6 +2895,8 @@ TEST(TEST_CATEGORY, MDParallelScan) {
                                                     Kokkos::Iterate::Left>(
             teamSize, N0, N1);
   }
+#endif // FOUND_CUDA_WORKAROUND
 }
+
 
 }  // namespace Test
