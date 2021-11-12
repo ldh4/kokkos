@@ -67,7 +67,7 @@ KOKKOS_ARCH_OPTION(ZEN3            HOST "AMD Zen3 architecture")
 KOKKOS_ARCH_OPTION(VEGA900         GPU  "AMD GPU MI25 GFX900")
 KOKKOS_ARCH_OPTION(VEGA906         GPU  "AMD GPU MI50/MI60 GFX906")
 KOKKOS_ARCH_OPTION(VEGA908         GPU  "AMD GPU MI100 GFX908")
-KOKKOS_ARCH_OPTION(VEGA90A         GPU  "" )
+KOKKOS_ARCH_OPTION(VEGA90A         GPU  "AMD GPU MI200 GFX90A")
 KOKKOS_ARCH_OPTION(INTEL_GEN       GPU  "Intel GPUs Gen9+")
 KOKKOS_ARCH_OPTION(INTEL_DG1       GPU  "Intel Iris XeMAX GPU")
 KOKKOS_ARCH_OPTION(INTEL_GEN9      GPU  "Intel GPU Gen9")
@@ -478,8 +478,8 @@ ENDFUNCTION()
 #to the corresponding flag name if ON
 CHECK_AMDGPU_ARCH(VEGA900 gfx900) # Radeon Instinct MI25
 CHECK_AMDGPU_ARCH(VEGA906 gfx906) # Radeon Instinct MI50 and MI60
-CHECK_AMDGPU_ARCH(VEGA908 gfx908)
-CHECK_AMDGPU_ARCH(VEGA90A gfx90a)
+CHECK_AMDGPU_ARCH(VEGA908 gfx908) # Radeon Instinct MI100
+CHECK_AMDGPU_ARCH(VEGA90A gfx90a) # Radeon Instinct MI200
 
 IF(KOKKOS_ENABLE_HIP AND NOT AMDGPU_ARCH_ALREADY_SPECIFIED)
   IF(KOKKOS_CXX_COMPILER_ID STREQUAL HIPCC)
@@ -557,27 +557,27 @@ IF (KOKKOS_ENABLE_SYCL)
     ENDIF()
   ELSEIF(KOKKOS_ARCH_INTEL_GEN)
     COMPILER_SPECIFIC_FLAGS(
-      DEFAULT -fsycl-targets=spir64_gen-unknown-unknown-sycldevice -Xsycl-target-backend "-device gen9-"
+      DEFAULT -fsycl-targets=spir64_gen -Xsycl-target-backend "-device gen9-"
     )
   ELSEIF(KOKKOS_ARCH_INTEL_GEN9)
     COMPILER_SPECIFIC_FLAGS(
-      DEFAULT -fsycl-targets=spir64_gen-unknown-unknown-sycldevice -Xsycl-target-backend "-device gen9"
+      DEFAULT -fsycl-targets=spir64_gen -Xsycl-target-backend "-device gen9"
     )
   ELSEIF(KOKKOS_ARCH_INTEL_GEN11)
     COMPILER_SPECIFIC_FLAGS(
-      DEFAULT -fsycl-targets=spir64_gen-unknown-unknown-sycldevice -Xsycl-target-backend "-device gen11"
+      DEFAULT -fsycl-targets=spir64_gen -Xsycl-target-backend "-device gen11"
     )
   ELSEIF(KOKKOS_ARCH_INTEL_GEN12LP)
     COMPILER_SPECIFIC_FLAGS(
-      DEFAULT -fsycl-targets=spir64_gen-unknown-unknown-sycldevice -Xsycl-target-backend "-device gen12lp"
+      DEFAULT -fsycl-targets=spir64_gen -Xsycl-target-backend "-device gen12lp"
     )
   ELSEIF(KOKKOS_ARCH_INTEL_DG1)
     COMPILER_SPECIFIC_FLAGS(
-      DEFAULT -fsycl-targets=spir64_gen-unknown-unknown-sycldevice -Xsycl-target-backend "-device dg1"
+      DEFAULT -fsycl-targets=spir64_gen -Xsycl-target-backend "-device dg1"
     )
   ELSEIF(KOKKOS_ARCH_INTEL_XEHP)
     COMPILER_SPECIFIC_FLAGS(
-      DEFAULT -fsycl-targets=spir64_gen-unknown-unknown-sycldevice -Xsycl-target-backend "-device xehp"
+      DEFAULT -fsycl-targets=spir64_gen -Xsycl-target-backend "-device xehp"
     )
   ENDIF()
 ENDIF()
