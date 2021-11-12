@@ -59,6 +59,7 @@ struct FunctorPatternInterface {
   struct FOR {};
   struct REDUCE {};
   struct SCAN {};
+  struct MDSCAN {};
 };
 
 /** \brief  Query Functor and execution policy argument tag for value type.
@@ -76,6 +77,7 @@ struct FunctorAnalysis {
   using FOR    = FunctorPatternInterface::FOR;
   using REDUCE = FunctorPatternInterface::REDUCE;
   using SCAN   = FunctorPatternInterface::SCAN;
+  using MDSCAN   = FunctorPatternInterface::MDSCAN;
 
   //----------------------------------------
 
@@ -282,6 +284,93 @@ struct FunctorAnalysis {
 
     using type = decltype(deduce(&F::operator()));
   };
+
+//donlee
+  template <typename F>
+  struct deduce_value_type<F, MDSCAN, void, true> {
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(M, M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(M, M, M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(M, M, M, M, M, 
+                                                             M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(M, M, M, M, M,
+                                                             M, M, A&, I) const);
+
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(M, M, M, M, M,
+                                                             M, M, M, A&, I) const);
+
+    using type = decltype(deduce(&F::operator()));
+  };
+
+  template <typename F>
+  struct deduce_value_type<F, MDSCAN, void, false> {
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag, M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag, M, M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag, M, M, M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag, M, M, M, M, M,
+                                                             M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag, M, M, M, M, M,
+                                                             M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag, M, M, M, M, M,
+                                                             M, M, M, A&, I) const);
+
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag const&, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag const&, M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag const&, M, M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag const&, M, M, M, M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag const&, M, M, M, M, M,
+                                                             M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag const&, M, M, M, M, M,
+                                                             M, M, A&, I) const);
+
+    template <typename M, typename A, typename I>
+    KOKKOS_INLINE_FUNCTION static A deduce(void (Functor::*)(WTag const&, M, M, M, M, M,
+                                                             M, M, M, A&, I) const);
+
+    using type = decltype(deduce(&F::operator()));
+  };
+
+//end of donlee
 
   //----------------------------------------
 

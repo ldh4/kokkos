@@ -1365,6 +1365,32 @@ parallel_reduce(
   parallel_reduce(boundaries, closure, reducer);
 }
 
+// template <Kokkos::Iterate Direction, size_t Rank, typename iType, typename Closure>
+// KOKKOS_INLINE_FUNCTION void parallel_scan(
+//     const Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Impl::CudaTeamMember>&
+//         loop_bounds, const Closure& lambda) {
+
+//   static_assert(false, "parallel_scan with MDTeamThreadRange is currently not supported.");
+// }
+
+// template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
+//           size_t Rank, typename iType, typename Closure>
+// KOKKOS_INLINE_FUNCTION void parallel_scan(
+//     const Impl::MDThreadVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank,
+//     iType, Impl::CudaTeamMember>& loop_bounds, const Closure& lambda) {
+
+//   static_assert(false, "parallel_scan with MDThreadVectorRange is currently not supported.");
+// }
+
+// template <Kokkos::Iterate OuterDirection, Kokkos::Iterate InnerDirection,
+//           size_t Rank, typename iType, typename Closure>
+// KOKKOS_INLINE_FUNCTION void parallel_scan(
+//     const Impl::MDTeamVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank,
+//     iType, Impl::CudaTeamMember>& loop_bounds, const Closure& lambda) {
+
+//   static_assert(false, "parallel_scan with MDTeamVectorRange is currently not supported.");
+// }
+
 // end of donlee
 
 }  // namespace Kokkos

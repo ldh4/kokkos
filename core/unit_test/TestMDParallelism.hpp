@@ -920,6 +920,7 @@ template <typename ExecSpace>
 struct TestMDParallelScan {
   using TeamType = typename Kokkos::TeamPolicy<ExecSpace>::member_type;
 
+#ifdef FOUND_CUDA_WORKAROUND
   static void test_scan2_MDTeamThreadRange(const int& N0, const int& N1) {
     using DataType     = int;
     using ViewType     = typename Kokkos::View<DataType**, ExecSpace>;
@@ -952,7 +953,6 @@ struct TestMDParallelScan {
     ASSERT_EQ(hostView(lastRow, lastCol), 3 * N0 * N1);
   }
 
-#ifdef FOUND_CUDA_WORKAROUND
   template <Kokkos::Iterate Direction>
   static void test_scan2_MDTeamThreadRange_with_direction(const int& N0,
                                                           const int& N1) {
@@ -2861,11 +2861,11 @@ TEST(TEST_CATEGORY, MDParallelScan) {
   int N6       = dims[6];
   int N7       = dims[7];
 
+#if 0
   {
     TestMDParallelScan<TEST_EXECSPACE>::test_scan2_MDTeamThreadRange(N0, N1);
   }
 
-#if 0
   {
     TestMDParallelScan<TEST_EXECSPACE>::test_scan2_MDTeamThreadRange(N0, N1);
 

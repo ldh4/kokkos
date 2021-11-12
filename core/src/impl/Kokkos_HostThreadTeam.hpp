@@ -1473,12 +1473,8 @@ parallel_scan(
     Impl::MDTeamThreadRangeBoundariesStruct<Direction, Rank, iType, Member> const& boundaries,
     Closure const& closure) {
 
-  
-
-  using ValueType = typename Kokkos::Implkkkk::FunctorAnalysis<
-      Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
-  // TODO Check for validity
-  // using ValueType = iType;
+  using ValueType = typename Kokkos::Impl::FunctorAnalysis<
+      Kokkos::Impl::FunctorPatternInterface::MDSCAN, void, Closure>::value_type;
 
   ValueType acc = 0;
 
@@ -1497,10 +1493,8 @@ parallel_scan(
     Impl::MDThreadVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Member>
     const& boundaries, Closure const& closure) {
 
-  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
-  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
-  // TODO Check for validity
-  using ValueType = iType;
+  using ValueType = typename Kokkos::Impl::FunctorAnalysis<
+      Kokkos::Impl::FunctorPatternInterface::MDSCAN, void, Closure>::value_type;
 
   ValueType scanVal = ValueType();
 
@@ -1519,10 +1513,8 @@ parallel_scan(
     Impl::MDTeamVectorRangeBoundariesStruct<OuterDirection, InnerDirection, Rank, iType, Member>
     const& boundaries, Closure const& closure) {
 
-  // using value_type = typename Kokkos::Impl::FunctorAnalysis<
-  //     Kokkos::Impl::FunctorPatternInterface::SCAN, void, Closure>::value_type;
-  // TODO Check for validity
-  using ValueType = iType;
+  using ValueType = typename Kokkos::Impl::FunctorAnalysis<
+      Kokkos::Impl::FunctorPatternInterface::MDSCAN, void, Closure>::value_type;
 
   ValueType acc = 0;
 
