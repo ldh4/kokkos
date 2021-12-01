@@ -2467,14 +2467,14 @@ TEST(TEST_CATEGORY, MDParallelFor) {
   int N6       = dims[6];
   int N7       = dims[7];
 
-  // {
-  //   TestMDParallelFor<TEST_EXECSPACE>::test_for3_MDTeamThreadRange(N0, N1, N2);
-  //   TestMDParallelFor<TEST_EXECSPACE>::test_for8_MDTeamThreadRange(N0, N1, N2, N3, N4, N5, N6, N7);
+  {
+    TestMDParallelFor<TEST_EXECSPACE>::test_for3_MDTeamThreadRange(N0, N1, N2);
+    TestMDParallelFor<TEST_EXECSPACE>::test_for8_MDTeamThreadRange(N0, N1, N2, N3, N4, N5, N6, N7);
 
-  //   TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDThreadVectorRange(N0, N1);
-  //   TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDTeamVectorRange(teamSize, N0,
-  //                                                                  N1);
-  // }
+    TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDThreadVectorRange(N0, N1);
+    TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDTeamVectorRange(teamSize, N0,
+                                                                   N1);
+  }
 
   // {
   //   TestMDParallelFor<TEST_EXECSPACE>::test_for3_MDTeamThreadRange(N0, N1, N2);
@@ -2497,16 +2497,16 @@ TEST(TEST_CATEGORY, MDParallelFor) {
   // }
 
   {
-    auto md_thread_vector_range = [](auto const& team, auto... ns) {
-      return Kokkos::MDTeamThreadRange(team, ns...);
-    };
+    // auto md_thread_vector_range = [](auto const& team, auto... ns) {
+    //   return Kokkos::MDTeamThreadRange(team, ns...);
+    // };
 
-    auto md_thread_vector_range_left = [](auto const& team, auto... ns) {
-      return Kokkos::MDTeamThreadRange<Kokkos::Iterate::Left>(team, ns...);
-    };
+    // auto md_thread_vector_range_left = [](auto const& team, auto... ns) {
+    //   return Kokkos::MDTeamThreadRange<Kokkos::Iterate::Left>(team, ns...);
+    // };
 
-    TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
-        md_thread_vector_range, N0, N1, N2);
+    // TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
+    //     md_thread_vector_range, N0, N1, N2);
     // TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
     //     md_thread_vector_range, N0, N1, N2, N3);
     // TestMDParallelFor<TEST_EXECSPACE>::test_for_MDTeamThreadRange(
