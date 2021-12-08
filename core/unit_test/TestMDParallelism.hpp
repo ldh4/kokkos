@@ -2469,11 +2469,11 @@ TEST(TEST_CATEGORY, MDParallelFor) {
 
   {
     TestMDParallelFor<TEST_EXECSPACE>::test_for3_MDTeamThreadRange(N0, N1, N2);
-    TestMDParallelFor<TEST_EXECSPACE>::test_for8_MDTeamThreadRange(N0, N1, N2, N3, N4, N5, N6, N7);
+    // TestMDParallelFor<TEST_EXECSPACE>::test_for8_MDTeamThreadRange(N0, N1, N2, N3, N4, N5, N6, N7);
 
-    TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDThreadVectorRange(N0, N1);
-    TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDTeamVectorRange(teamSize, N0,
-                                                                   N1);
+    // TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDThreadVectorRange(N0, N1);
+    // TestMDParallelFor<TEST_EXECSPACE>::test_for2_MDTeamVectorRange(teamSize, N0,
+    //                                                                N1);
   }
 
   // {
@@ -2588,12 +2588,12 @@ TEST(TEST_CATEGORY, MDParallelReduce) {
   int N7       = dims[7];
 
 {
-    TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDTeamThreadRange(N0,
-                                                                         N1);
-    TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDThreadVectorRange(N0,
-                                                                           N1);
-    TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDTeamVectorRange(N0,
-                                                                         N1);
+    // TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDTeamThreadRange(N0,
+    //                                                                      N1);
+    // TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDThreadVectorRange(N0,
+    //                                                                        N1);
+    // TestMDParallelReduce<TEST_EXECSPACE>::test_reduce2_MDTeamVectorRange(N0,
+    //                                                                      N1);
 }
 
 
