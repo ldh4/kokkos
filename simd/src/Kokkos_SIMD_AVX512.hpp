@@ -201,6 +201,10 @@ class simd<std::int32_t, simd_abi::avx512_fixed_size<8>> {
     return m_value;
   }
 
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION simd operator-() const
       noexcept {
     return simd(_mm256_sub_epi32(_mm256_set1_epi32(0), m_value));
@@ -270,6 +274,9 @@ class simd<std::int32_t, simd_abi::avx512_fixed_size<8>> {
     return simd(_mm256_sllv_epi32(static_cast<__m256i>(lhs),
                                   static_cast<__m256i>(rhs)));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION
@@ -358,6 +365,10 @@ class simd<std::uint32_t, simd_abi::avx512_fixed_size<8>> {
     return m_value;
   }
 
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION friend simd operator*(
       simd const& lhs, simd const& rhs) noexcept {
     return simd(_mm256_mullo_epi32(static_cast<__m256i>(lhs),
@@ -423,6 +434,9 @@ class simd<std::uint32_t, simd_abi::avx512_fixed_size<8>> {
     return simd(_mm256_sllv_epi32(static_cast<__m256i>(lhs),
                                   static_cast<__m256i>(rhs)));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION
@@ -507,6 +521,10 @@ class simd<std::int64_t, simd_abi::avx512_fixed_size<8>> {
     return m_value;
   }
 
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION simd operator-() const
       noexcept {
     return simd(_mm512_sub_epi64(_mm512_set1_epi64(0), m_value));
@@ -578,6 +596,9 @@ class simd<std::int64_t, simd_abi::avx512_fixed_size<8>> {
     return simd(_mm512_sllv_epi64(static_cast<__m512i>(lhs),
                                   static_cast<__m512i>(rhs)));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION
@@ -666,6 +687,10 @@ class simd<std::uint64_t, simd_abi::avx512_fixed_size<8>> {
     return m_value;
   }
 
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION friend simd operator*(
       simd const& lhs, simd const& rhs) noexcept {
     return simd(_mm512_mullo_epi64(static_cast<__m512i>(lhs),
@@ -740,6 +765,9 @@ class simd<std::uint64_t, simd_abi::avx512_fixed_size<8>> {
     return mask_type(_mm512_cmpneq_epu64_mask(static_cast<__m512i>(lhs),
                                               static_cast<__m512i>(rhs)));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION
@@ -829,6 +857,11 @@ class simd<double, simd_abi::avx512_fixed_size<8>> {
       const {
     return m_value;
   }
+
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION simd operator-() const
       noexcept {
     return simd(_mm512_sub_pd(_mm512_set1_pd(0.0), m_value));
@@ -884,6 +917,9 @@ class simd<double, simd_abi::avx512_fixed_size<8>> {
     return mask_type(_mm512_cmp_pd_mask(
         static_cast<__m512d>(lhs), static_cast<__m512d>(rhs), _CMP_NEQ_OS));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION

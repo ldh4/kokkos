@@ -135,6 +135,10 @@ class simd<T, simd_abi::scalar> {
     return simd(-m_value);
   }
 
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_FORCEINLINE_FUNCTION friend constexpr simd operator*(
       simd const& lhs, simd const& rhs) noexcept {
     return simd(lhs.m_value * rhs.m_value);
@@ -199,6 +203,9 @@ class simd<T, simd_abi::scalar> {
   operator!=(simd const& lhs, simd const& rhs) noexcept {
     return mask_type(lhs.m_value != rhs.m_value);
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 template <class T>

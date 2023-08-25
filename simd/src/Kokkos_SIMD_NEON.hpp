@@ -366,6 +366,11 @@ class simd<double, simd_abi::neon_fixed_size<2>> {
   operator float64x2_t() const {
     return m_value;
   }
+
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION simd operator-() const
       noexcept {
     return simd(vnegq_f64(m_value));
@@ -422,6 +427,9 @@ class simd<double, simd_abi::neon_fixed_size<2>> {
   operator!=(simd const& lhs, simd const& rhs) noexcept {
     return !(operator==(lhs, rhs));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION
@@ -566,6 +574,10 @@ class simd<std::int32_t, simd_abi::neon_fixed_size<2>> {
     return m_value;
   }
 
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION simd operator-() const
       noexcept {
     return simd(vneg_s32(m_value));
@@ -632,6 +644,9 @@ class simd<std::int32_t, simd_abi::neon_fixed_size<2>> {
     return simd(
         vshl_s32(static_cast<int32x2_t>(lhs), static_cast<int32x2_t>(rhs)));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION
@@ -732,6 +747,10 @@ class simd<std::int64_t, simd_abi::neon_fixed_size<2>> {
     return m_value;
   }
 
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION simd operator-() const
       noexcept {
     return simd(vnegq_s64(m_value));
@@ -798,6 +817,9 @@ class simd<std::int64_t, simd_abi::neon_fixed_size<2>> {
     return simd(
         vshlq_s64(static_cast<int64x2_t>(lhs), static_cast<int64x2_t>(rhs)));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION
@@ -896,6 +918,10 @@ class simd<std::uint64_t, simd_abi::neon_fixed_size<2>> {
     return m_value;
   }
 
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
+#endif
   [[nodiscard]] KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION friend simd operator-(
       simd const& lhs, simd const& rhs) noexcept {
     return simd(
@@ -948,6 +974,9 @@ class simd<std::uint64_t, simd_abi::neon_fixed_size<2>> {
     return simd(vshlq_u64(static_cast<uint64x2_t>(lhs),
                           vreinterpretq_s64_u64(static_cast<uint64x2_t>(rhs))));
   }
+#ifdef KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#pragma GCC diagnostic pop
+#endif
 };
 
 KOKKOS_IMPL_HOST_FORCEINLINE_FUNCTION

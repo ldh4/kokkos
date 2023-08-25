@@ -26,6 +26,10 @@ namespace Kokkos {
 
 namespace Experimental {
 
+#if defined(KOKKOS_COMPILER_NVCC) && KOKKOS_COMPILER_NVCC < 1130
+#define KOKKOS_IMPL_SUPPRESS_BOGUS_NVCC_ATTRIBUTE_IGNORED_WARNING
+#endif
+
 template <class T, class Abi>
 class simd;
 
